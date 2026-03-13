@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🌍 세계 날씨 비교</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface2: #273548;
+      --border: #334155;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.2);
+      --hot: #f97316;
+      --warm: #facc15;
+      --cool: #60a5fa;
+      --cold: #818cf8;
+    }
+    .light {
+      --bg: #f0f4f8;
+      --surface: #ffffff;
+      --surface2: #e8f0f7;
+      --border: #cbd5e1;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --accent: #0284c7;
+      --accent-glow: rgba(2, 132, 199, 0.15);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+      min-height: 100vh;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+    }
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .logo {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .logo span { color: var(--text); }
+
+    .search-box {
+      flex: 1;
+      min-width: 220px;
+      position: relative;
+    }
+    .search-box input {
+      width: 100%;
+      padding: 10px 16px 10px 40px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-box input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .search-box .icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 1rem;
+      pointer-events: none;
+    }
+    .autocomplete {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0; right: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      z-index: 2000;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .autocomplete-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.15s;
+    }
+    .autocomplete-item:hover { background: var(--surface2); }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .btn {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ── View toggle ── */
+    .view-toggle {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .view-toggle .btn {
+      border-radius: 0;
+      border: none;
+      border-right: 1px solid var(--border);
+      padding: 8px 16px;
+    }
+    .view-toggle .btn:last-child { border-right: none; }
+
+    /* ── Sort bar ── */
+    .sort-bar {
+      max-width: 1400px;
+      margin: 20px auto 0;
+      padding: 0 24px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .sort-label { font-size: 0.8rem; color: var(--text-muted); }
+
+    /* ── Grid ── */
+    .grid-wrap {
+      max-width: 1400px;
+      margin: 16px auto 40px;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    /* ── Map ── */
+    #map-wrap {
+      display: none;
+      height: calc(100vh - 140px);
+      min-height: 500px;
+      margin: 16px 24px 0;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    #map { width: 100%; height: 100%; }
+
+    /* Leaflet popup 커스텀 */
+    .leaflet-popup-content-wrapper {
+      background: var(--surface) !important;
+      color: var(--text) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 16px !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+      padding: 0 !important;
+    }
+    .leaflet-popup-content {
+      margin: 0 !important;
+      width: auto !important;
+    }
+    .leaflet-popup-tip { background: var(--surface) !important; }
+    .leaflet-popup-close-button {
+      color: var(--text-muted) !important;
+      font-size: 1.2rem !important;
+      top: 10px !important;
+      right: 12px !important;
+    }
+
+    .popup-inner {
+      padding: 18px 20px;
+      min-width: 200px;
+    }
+    .popup-city { font-size: 1.1rem; font-weight: 700; margin-bottom: 2px; }
+    .popup-country { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px; }
+    .popup-main { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .popup-icon { font-size: 2.4rem; line-height: 1; }
+    .popup-temp { font-size: 2rem; font-weight: 800; letter-spacing: -1px; }
+    .popup-desc { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+    .popup-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .popup-meta {
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 0.75rem;
+    }
+    .popup-meta-label { color: var(--text-muted); margin-bottom: 2px; }
+    .popup-meta-value { font-weight: 600; font-size: 0.85rem; }
+
+    /* 날씨 마커 */
+    .weather-marker {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+    }
+    .weather-marker-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+      border: 2px solid rgba(255,255,255,0.25);
+      transition: transform 0.15s;
+      line-height: 1;
+      color: #fff;
+    }
+    .weather-marker-badge:hover { transform: scale(1.1); }
+    .weather-marker-badge .m-icon { font-size: 1rem; }
+    .weather-marker-tail {
+      width: 2px;
+      height: 8px;
+      background: rgba(255,255,255,0.5);
+      border-radius: 2px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 20px 20px 78px;
+      position: relative;
+      transition: transform 0.2s, box-shadow 0.2s;
+      animation: fadeIn 0.4s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    .card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.25); }
+
+    .card-remove {
+      position: absolute;
+      top: 12px; right: 12px;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s, background 0.2s;
+    }
+    .card:hover .card-remove { opacity: 1; }
+    .card-remove:hover { background: #ef444422; color: #ef4444; }
+
+    .card-city { font-size: 1.05rem; font-weight: 700; margin-bottom: 2px; }
+    .card-country { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px; }
+    .card-localtime {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 12px;
+      letter-spacing: 0.02em;
+    }
+    .card-weather-icon { font-size: 2.8rem; line-height: 1; margin-bottom: 8px; }
+    .card-temp {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 2px;
+    }
+    .card-desc { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px; }
+
+    .card-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .meta-item {
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 0.75rem;
+    }
+    .meta-label { color: var(--text-muted); margin-bottom: 2px; }
+    .meta-value { font-weight: 600; font-size: 0.85rem; }
+
+    .temp-hot  { color: var(--hot); }
+    .temp-warm { color: var(--warm); }
+    .temp-cool { color: var(--cool); }
+    .temp-cold { color: var(--cold); }
+
+    .card-bar {
+      margin-top: 12px;
+      height: 4px;
+      border-radius: 4px;
+      background: var(--border);
+      overflow: hidden;
+    }
+    .card-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.8s ease;
+    }
+
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 8px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    .card-skeleton .sk-title  { height: 18px; width: 60%; margin-bottom: 6px; }
+    .card-skeleton .sk-sub    { height: 12px; width: 40%; margin-bottom: 20px; }
+    .card-skeleton .sk-icon   { height: 48px; width: 48px; border-radius: 50%; margin-bottom: 10px; }
+    .card-skeleton .sk-temp   { height: 36px; width: 80px; margin-bottom: 8px; }
+    .card-skeleton .sk-desc   { height: 12px; width: 55%; margin-bottom: 16px; }
+    .card-skeleton .sk-meta   { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .card-skeleton .sk-meta > div { height: 52px; border-radius: 10px; }
+
+    .error-msg { color: #f87171; font-size: 0.8rem; margin-top: 8px; }
+
+    /* ── Compare ── */
+    .card-compare-btn {
+      position: absolute; bottom: 8px; left: 12px;
+      padding: 5px 10px; border-radius: 999px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text-muted); font-size: 0.72rem; cursor: pointer;
+      opacity: 1; transition: opacity 0.2s, background 0.2s, color 0.2s;
+      white-space: nowrap;
+    }
+    .card-compare-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; opacity: 1; }
+    .card.comparing { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+    #compareBar {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 900;
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 12px 24px; display: none;
+      align-items: center; gap: 12px; flex-wrap: wrap;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+    }
+    .compare-bar-label { font-size: 0.85rem; color: var(--text-muted); white-space: nowrap; }
+    .compare-bar-cities { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
+    .compare-bar-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 999px; padding: 4px 12px; font-size: 0.82rem;
+    }
+    .compare-bar-chip button { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; padding: 0; line-height: 1; }
+    .compare-bar-chip button:hover { color: #ef4444; }
+    .compare-bar-actions { display: flex; gap: 8px; }
+    #compareModal {
+      display: none; position: fixed; inset: 0; z-index: 1500;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    .compare-modal-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 24px; width: 100%; max-width: 920px;
+      max-height: 90vh; overflow-y: auto; padding: 28px;
+      animation: fadeIn 0.25s ease;
+    }
+    .compare-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .compare-modal-title { font-size: 1.2rem; font-weight: 700; }
+    .compare-modal-close { background: none; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer; line-height: 1; }
+    .compare-modal-close:hover { color: var(--text); }
+    .compare-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .compare-table th, .compare-table td { padding: 11px 14px; border-bottom: 1px solid var(--border); text-align: center; vertical-align: middle; }
+    .compare-table th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; }
+    .compare-table td:first-child { text-align: left; color: var(--text-muted); font-size: 0.8rem; white-space: nowrap; }
+    .compare-table th.city-col { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+    .cmp-mascot svg { height: 54px; width: auto; display: block; margin: 0 auto 4px; }
+    .cmp-win-hot  { color: var(--hot);  font-weight: 800; }
+    .cmp-win-cold { color: var(--cold); font-weight: 800; }
+    .cmp-win-best { color: var(--accent); font-weight: 800; }
+
+    /* ── Mascot ── */
+    .mascot {
+      position: absolute;
+      bottom: 4px;
+      right: 8px;
+      height: 72px;
+      width: auto;
+      pointer-events: none;
+      filter: drop-shadow(1px 2px 5px rgba(0,0,0,0.18));
+    }
+    .mascot svg { height: 72px; width: auto; display: block; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      border-top: 1px solid var(--border);
+      margin-top: 20px;
+    }
+    .last-updated {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      padding: 8px 24px 0;
+    }
+
+    @media (max-width: 600px) {
+      .grid-wrap { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+      .card { padding: 16px; }
+      .card-temp { font-size: 1.8rem; }
+      #map-wrap { margin: 12px 12px 0; border-radius: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">🌍 <span>세계 날씨</span></div>
+
+    <div class="search-box" id="searchWrap">
+      <span class="icon">🔍</span>
+      <input id="searchInput" type="text" placeholder="도시 검색 후 추가..." autocomplete="off" />
+      <div class="autocomplete" id="autocomplete" style="display:none"></div>
+    </div>
+
+    <div class="controls">
+      <!-- 뷰 전환 -->
+      <div class="view-toggle">
+        <button class="btn active" id="viewGrid" onclick="setView('grid')" title="카드 그리드">⊞ 카드</button>
+        <button class="btn"        id="viewMap"  onclick="setView('map')"  title="세계 지도">🗺 지도</button>
+      </div>
+      <!-- 단위 -->
+      <button class="btn active" id="btnC" onclick="setUnit('C')">°C</button>
+      <button class="btn"        id="btnF" onclick="setUnit('F')">°F</button>
+      <!-- 테마 -->
+      <button class="btn" id="themeBtn" onclick="toggleTheme()">☀️ 라이트</button>
+    </div>
+  </div>
+</header>
+
+<div class="sort-bar" id="sortBar">
+  <span class="sort-label">정렬:</span>
+  <button class="btn active" id="sort-default"   onclick="setSort('default')">기본</button>
+  <button class="btn"        id="sort-temp-desc" onclick="setSort('temp-desc')">🔥 높은 온도</button>
+  <button class="btn"        id="sort-temp-asc"  onclick="setSort('temp-asc')">❄️ 낮은 온도</button>
+  <button class="btn"        id="sort-name"      onclick="setSort('name')">가나다순</button>
+</div>
+
+<div class="last-updated" id="lastUpdated"></div>
+
+<!-- 카드 그리드 -->
+<div class="grid-wrap" id="grid"></div>
+
+<!-- 지도 -->
+<div id="map-wrap">
+  <div id="map"></div>
+</div>
+
+<!-- 비교 바 -->
+<div id="compareBar">
+  <span class="compare-bar-label">비교 선택:</span>
+  <div class="compare-bar-cities" id="compareChips"></div>
+  <div class="compare-bar-actions">
+    <button class="btn" onclick="clearCompare()">초기화</button>
+    <button class="btn active" id="compareBtn" onclick="openCompareModal()">📊 비교하기</button>
+  </div>
+</div>
+
+<!-- 비교 모달 -->
+<div id="compareModal" onclick="if(event.target===this)closeCompareModal()">
+  <div class="compare-modal-box">
+    <div class="compare-modal-header">
+      <div class="compare-modal-title">📊 도시 날씨 비교</div>
+      <button class="compare-modal-close" onclick="closeCompareModal()">✕</button>
+    </div>
+    <div id="compareModalBody"></div>
+  </div>
+</div>
+
+<footer>
+  데이터: <a href="https://open-meteo.com" target="_blank" style="color:var(--accent)">Open-Meteo</a> (무료 오픈소스 날씨 API) &nbsp;·&nbsp; 지도: <a href="https://leafletjs.com" target="_blank" style="color:var(--accent)">Leaflet</a> + <a href="https://carto.com/attribution" target="_blank" style="color:var(--accent)">CARTO</a> &nbsp;·&nbsp; 자동 새로고침: 10분
+</footer>
+
+<script>
+/* ─────────────── 기본 도시 목록 ─────────────── */
+const DEFAULT_CITIES = [
+  { name: '서울',       country: '대한민국',   lat: 37.5665, lon: 126.9780, tz: 'Asia/Seoul'                    },
+  { name: '도쿄',       country: '일본',       lat: 35.6762, lon: 139.6503, tz: 'Asia/Tokyo'                    },
+  { name: '뉴욕',       country: '미국',       lat: 40.7128, lon: -74.0060, tz: 'America/New_York'              },
+  { name: '런던',       country: '영국',       lat: 51.5074, lon: -0.1278,  tz: 'Europe/London'                 },
+  { name: '파리',       country: '프랑스',     lat: 48.8566, lon: 2.3522,   tz: 'Europe/Paris'                  },
+  { name: '시드니',     country: '호주',       lat: -33.8688,lon: 151.2093, tz: 'Australia/Sydney'              },
+  { name: '두바이',     country: 'UAE',        lat: 25.2048, lon: 55.2708,  tz: 'Asia/Dubai'                    },
+  { name: '싱가포르',   country: '싱가포르',   lat: 1.3521,  lon: 103.8198, tz: 'Asia/Singapore'                },
+  { name: '베이징',     country: '중국',       lat: 39.9042, lon: 116.4074, tz: 'Asia/Shanghai'                 },
+  { name: '뭄바이',     country: '인도',       lat: 19.0760, lon: 72.8777,  tz: 'Asia/Kolkata'                  },
+  { name: '카이로',     country: '이집트',     lat: 30.0444, lon: 31.2357,  tz: 'Africa/Cairo'                  },
+  { name: '모스크바',   country: '러시아',     lat: 55.7558, lon: 37.6173,  tz: 'Europe/Moscow'                 },
+  { name: '상파울루',   country: '브라질',     lat: -23.5505,lon: -46.6333, tz: 'America/Sao_Paulo'             },
+  { name: '멕시코시티', country: '멕시코',     lat: 19.4326, lon: -99.1332, tz: 'America/Mexico_City'           },
+  { name: '토론토',     country: '캐나다',     lat: 43.6532, lon: -79.3832, tz: 'America/Toronto'               },
+  { name: '베를린',     country: '독일',       lat: 52.5200, lon: 13.4050,  tz: 'Europe/Berlin'                 },
+  { name: '이스탄불',   country: '튀르키예',   lat: 41.0082, lon: 28.9784,  tz: 'Europe/Istanbul'               },
+  { name: '방콕',       country: '태국',       lat: 13.7563, lon: 100.5018, tz: 'Asia/Bangkok'                  },
+  { name: '라고스',     country: '나이지리아', lat: 6.5244,  lon: 3.3792,   tz: 'Africa/Lagos'                  },
+  { name: '부에노스아이레스', country: '아르헨티나', lat: -34.6037, lon: -58.3816, tz: 'America/Argentina/Buenos_Aires' },
+];
+
+/* ─────────────── WMO 날씨 코드 ─────────────── */
+function wmoInfo(code) {
+  const map = {
+    0:  { icon: '☀️',  desc: '맑음' },
+    1:  { icon: '🌤️', desc: '대체로 맑음' },
+    2:  { icon: '⛅',  desc: '부분 구름' },
+    3:  { icon: '☁️',  desc: '흐림' },
+    45: { icon: '🌫️', desc: '안개' },
+    48: { icon: '🌫️', desc: '서리 안개' },
+    51: { icon: '🌦️', desc: '가벼운 이슬비' },
+    53: { icon: '🌦️', desc: '이슬비' },
+    55: { icon: '🌦️', desc: '강한 이슬비' },
+    61: { icon: '🌧️', desc: '가벼운 비' },
+    63: { icon: '🌧️', desc: '비' },
+    65: { icon: '🌧️', desc: '강한 비' },
+    71: { icon: '🌨️', desc: '가벼운 눈' },
+    73: { icon: '❄️',  desc: '눈' },
+    75: { icon: '❄️',  desc: '강한 눈' },
+    77: { icon: '🌨️', desc: '싸라기눈' },
+    80: { icon: '🌦️', desc: '소나기' },
+    81: { icon: '🌦️', desc: '강한 소나기' },
+    82: { icon: '⛈️', desc: '폭우' },
+    85: { icon: '🌨️', desc: '눈 소나기' },
+    86: { icon: '🌨️', desc: '강한 눈 소나기' },
+    95: { icon: '⛈️', desc: '뇌우' },
+    96: { icon: '⛈️', desc: '우박 동반 뇌우' },
+    99: { icon: '⛈️', desc: '강한 뇌우' },
+  };
+  return map[code] || { icon: '🌡️', desc: '알 수 없음' };
+}
+
+/* ─────────────── 온도 색상 ─────────────── */
+function tempClass(c) {
+  if (c >= 30) return 'temp-hot';
+  if (c >= 15) return 'temp-warm';
+  if (c >= 5)  return 'temp-cool';
+  return 'temp-cold';
+}
+function tempBarColor(c) {
+  if (c >= 30) return '#f97316';
+  if (c >= 15) return '#facc15';
+  if (c >= 5)  return '#60a5fa';
+  return '#818cf8';
+}
+function tempBarWidth(c) {
+  const pct = Math.min(100, Math.max(0, ((c + 20) / 70) * 100));
+  return pct.toFixed(1) + '%';
+}
+
+/* ─────────────── 상태 ─────────────── */
+let unit  = 'C';
+let sort  = 'default';
+let theme = 'dark';
+let view  = 'grid';
+let cities = [...DEFAULT_CITIES];
+
+function toDisplay(c) {
+  return unit === 'C' ? Math.round(c) + '°C' : Math.round(c * 9/5 + 32) + '°F';
+}
+
+/* ─────────────── API 호출 ─────────────── */
+async function fetchWeather(city) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,weathercode,windspeed_10m,relativehumidity_2m,apparent_temperature&timezone=auto&wind_speed_unit=ms`;
+  const res  = await fetch(url);
+  if (!res.ok) throw new Error('API 오류');
+  const json = await res.json();
+  const cur  = json.current;
+  return {
+    temp:        cur.temperature_2m,
+    feelsLike:   cur.apparent_temperature,
+    weatherCode: cur.weathercode,
+    wind:        cur.windspeed_10m,
+    humidity:    cur.relativehumidity_2m,
+    timezone:    json.timezone,
+  };
+}
+
+async function loadAll() {
+  const now = new Date();
+  document.getElementById('lastUpdated').textContent =
+    `마지막 업데이트: ${now.toLocaleTimeString('ko-KR')}`;
+
+  renderAll();
+
+  await Promise.allSettled(
+    cities.map(async (city, i) => {
+      try {
+        city.data  = await fetchWeather(city);
+        city.error = null;
+      } catch {
+        city.error = '데이터를 불러올 수 없습니다';
+        city.data  = null;
+      }
+      renderCard(i);
+      updateMarker(i);
+    })
+  );
+
+  const now2 = new Date();
+  document.getElementById('lastUpdated').textContent =
+    `마지막 업데이트: ${now2.toLocaleTimeString('ko-KR')}`;
+}
+
+/* ─────────────── 마스코트 SVG ─────────────── */
+const MASCOTS = {
+  '서울': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <ellipse cx="21" cy="22" rx="11" ry="12" fill="#f5f5f5" stroke="#333" stroke-width="1.5"/>
+    <ellipse cx="59" cy="22" rx="11" ry="12" fill="#f5f5f5" stroke="#333" stroke-width="1.5"/>
+    <ellipse cx="21" cy="22" rx="6" ry="7" fill="#fca5a5"/>
+    <ellipse cx="59" cy="22" rx="6" ry="7" fill="#fca5a5"/>
+    <ellipse cx="40" cy="44" rx="27" ry="25" fill="#f5f5f5" stroke="#333" stroke-width="1.5"/>
+    <path d="M32,22 Q31,32 29,40" stroke="#bbb" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <line x1="40" y1="19" x2="40" y2="31" stroke="#bbb" stroke-width="2" stroke-linecap="round"/>
+    <path d="M48,22 Q49,32 51,40" stroke="#bbb" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <ellipse cx="29" cy="42" rx="5.5" ry="5" fill="#f97316"/>
+    <ellipse cx="51" cy="42" rx="5.5" ry="5" fill="#f97316"/>
+    <circle cx="29" cy="42" r="3" fill="#222"/>
+    <circle cx="51" cy="42" r="3" fill="#222"/>
+    <circle cx="30" cy="41" r="1" fill="#fff"/>
+    <circle cx="52" cy="41" r="1" fill="#fff"/>
+    <ellipse cx="40" cy="50" rx="4" ry="3" fill="#f9a8d4"/>
+    <path d="M36,53 Q40,57 44,53" stroke="#555" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <line x1="13" y1="48" x2="33" y2="51" stroke="#ccc" stroke-width="1"/>
+    <line x1="13" y1="52" x2="33" y2="53" stroke="#ccc" stroke-width="1"/>
+    <line x1="47" y1="51" x2="67" y2="48" stroke="#ccc" stroke-width="1"/>
+    <line x1="47" y1="53" x2="67" y2="52" stroke="#ccc" stroke-width="1"/>
+    <ellipse cx="40" cy="83" rx="18" ry="13" fill="#f5f5f5" stroke="#333" stroke-width="1.5"/>
+    <line x1="34" y1="73" x2="32" y2="82" stroke="#ddd" stroke-width="2" stroke-linecap="round"/>
+    <line x1="40" y1="71" x2="40" y2="82" stroke="#ddd" stroke-width="2" stroke-linecap="round"/>
+    <line x1="46" y1="73" x2="48" y2="82" stroke="#ddd" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="27" cy="94" rx="8" ry="4" fill="#f5f5f5" stroke="#333" stroke-width="1.5"/>
+    <ellipse cx="53" cy="94" rx="8" ry="4" fill="#f5f5f5" stroke="#333" stroke-width="1.5"/>
+  </svg>`,
+  '도쿄': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <polygon points="17,20 23,6 29,20" fill="#222" stroke="#111" stroke-width="1"/>
+    <polygon points="51,20 57,6 63,20" fill="#222" stroke="#111" stroke-width="1"/>
+    <polygon points="19,19 23,10 27,19" fill="#555"/>
+    <polygon points="53,19 57,10 61,19" fill="#555"/>
+    <ellipse cx="40" cy="41" rx="27" ry="25" fill="#222" stroke="#111" stroke-width="1.5"/>
+    <ellipse cx="40" cy="41" rx="21" ry="20" fill="#ffe0bd"/>
+    <rect x="18" y="47" width="44" height="18" rx="5" fill="#222"/>
+    <ellipse cx="30" cy="39" rx="5.5" ry="5" fill="#e2e8f0"/>
+    <ellipse cx="50" cy="39" rx="5.5" ry="5" fill="#e2e8f0"/>
+    <circle cx="30" cy="39" r="3" fill="#222"/>
+    <circle cx="50" cy="39" r="3" fill="#222"/>
+    <circle cx="31" cy="38" r="1" fill="#fff"/>
+    <circle cx="51" cy="38" r="1" fill="#fff"/>
+    <rect x="24" y="68" width="32" height="24" rx="8" fill="#222" stroke="#111" stroke-width="1.5"/>
+    <rect x="22" y="78" width="36" height="6" rx="3" fill="#cc0000"/>
+    <ellipse cx="29" cy="93" rx="8" ry="5" fill="#222" stroke="#111" stroke-width="1.5"/>
+    <ellipse cx="51" cy="93" rx="8" ry="5" fill="#222" stroke="#111" stroke-width="1.5"/>
+  </svg>`,
+  '뉴욕': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <polygon points="29,16 32,6 35,16" fill="#2d9e6b"/>
+    <polygon points="38,14 40,4 42,14" fill="#2d9e6b"/>
+    <polygon points="45,16 48,6 51,16" fill="#2d9e6b"/>
+    <rect x="26" y="15" width="28" height="7" rx="3" fill="#2d9e6b" stroke="#1a7a4f" stroke-width="1"/>
+    <ellipse cx="40" cy="37" rx="22" ry="21" fill="#5bc4a1" stroke="#2d9e6b" stroke-width="1.5"/>
+    <ellipse cx="40" cy="38" rx="14" ry="16" fill="#81d4b5"/>
+    <ellipse cx="33" cy="35" rx="3.5" ry="4" fill="#1a4a3a"/>
+    <ellipse cx="47" cy="35" rx="3.5" ry="4" fill="#1a4a3a"/>
+    <circle cx="34" cy="34" r="1" fill="#fff"/>
+    <circle cx="48" cy="34" r="1" fill="#fff"/>
+    <path d="M35,43 Q40,46 45,43" stroke="#1a4a3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M20,60 Q18,84 18,100 L62,100 Q62,84 60,60 Q50,56 40,56 Q30,56 20,60Z" fill="#2d9e6b" stroke="#1a7a4f" stroke-width="1.5"/>
+    <line x1="30" y1="63" x2="28" y2="93" stroke="#1a7a4f" stroke-width="1"/>
+    <line x1="40" y1="60" x2="40" y2="93" stroke="#1a7a4f" stroke-width="1"/>
+    <line x1="50" y1="63" x2="52" y2="93" stroke="#1a7a4f" stroke-width="1"/>
+    <line x1="55" y1="58" x2="65" y2="42" stroke="#2d9e6b" stroke-width="4" stroke-linecap="round"/>
+    <ellipse cx="65" cy="38" rx="5" ry="8" fill="#f97316"/>
+    <ellipse cx="65" cy="40" rx="3" ry="5" fill="#facc15"/>
+  </svg>`,
+  '런던': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <rect x="15" y="3" width="50" height="27" rx="4" fill="#111" stroke="#000" stroke-width="1"/>
+    <rect x="18" y="3" width="44" height="5" rx="2" fill="#222"/>
+    <path d="M18,30 Q20,35 25,35" stroke="#c8a500" stroke-width="2" fill="none"/>
+    <path d="M62,30 Q60,35 55,35" stroke="#c8a500" stroke-width="2" fill="none"/>
+    <ellipse cx="40" cy="44" rx="22" ry="20" fill="#fde8c8" stroke="#d4a888" stroke-width="1.5"/>
+    <ellipse cx="31" cy="42" rx="4" ry="4" fill="#555"/>
+    <ellipse cx="49" cy="42" rx="4" ry="4" fill="#555"/>
+    <circle cx="32" cy="41" r="1.5" fill="#fff"/>
+    <circle cx="50" cy="41" r="1.5" fill="#fff"/>
+    <ellipse cx="40" cy="48" rx="3" ry="2" fill="#e5b89b"/>
+    <line x1="35" y1="53" x2="45" y2="53" stroke="#c07060" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M18,63 L18,100 L62,100 L62,63 Q50,57 40,57 Q30,57 18,63Z" fill="#cc0000" stroke="#990000" stroke-width="1.5"/>
+    <circle cx="40" cy="68" r="2" fill="#c8a500"/>
+    <circle cx="40" cy="76" r="2" fill="#c8a500"/>
+    <circle cx="40" cy="84" r="2" fill="#c8a500"/>
+    <path d="M18,63 L28,57 L32,71Z" fill="#111"/>
+    <path d="M62,63 L52,57 L48,71Z" fill="#111"/>
+  </svg>`,
+  '파리': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <ellipse cx="40" cy="21" rx="30" ry="11" fill="#cc0000"/>
+    <ellipse cx="40" cy="21" rx="24" ry="8" fill="#bb0000"/>
+    <circle cx="55" cy="15" r="3" fill="#cc0000" stroke="#aa0000" stroke-width="1"/>
+    <ellipse cx="40" cy="43" rx="22" ry="22" fill="#fde8c8" stroke="#d4a888" stroke-width="1.5"/>
+    <path d="M31,51 Q35,54 40,52 Q45,54 49,51" stroke="#333" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <ellipse cx="30" cy="40" rx="4.5" ry="5" fill="#4a3728"/>
+    <ellipse cx="50" cy="40" rx="4.5" ry="5" fill="#4a3728"/>
+    <circle cx="31" cy="39" r="1.5" fill="#fff"/>
+    <circle cx="51" cy="39" r="1.5" fill="#fff"/>
+    <ellipse cx="40" cy="47" rx="4" ry="3" fill="#e5b89b"/>
+    <path d="M18,63 L18,100 L62,100 L62,63 Q50,57 40,57 Q30,57 18,63Z" fill="#fff" stroke="#003f9c" stroke-width="1.5"/>
+    <line x1="18" y1="68" x2="62" y2="68" stroke="#003f9c" stroke-width="3"/>
+    <line x1="18" y1="76" x2="62" y2="76" stroke="#003f9c" stroke-width="3"/>
+    <line x1="18" y1="84" x2="62" y2="84" stroke="#003f9c" stroke-width="3"/>
+    <line x1="18" y1="92" x2="62" y2="92" stroke="#003f9c" stroke-width="3"/>
+    <rect x="52" y="56" width="20" height="6" rx="3" fill="#d4a56a" stroke="#b8834a" stroke-width="1" transform="rotate(-35 62 59)"/>
+  </svg>`,
+  '시드니': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <ellipse cx="15" cy="29" rx="14" ry="14" fill="#9e9e9e" stroke="#757575" stroke-width="1.5"/>
+    <ellipse cx="65" cy="29" rx="14" ry="14" fill="#9e9e9e" stroke="#757575" stroke-width="1.5"/>
+    <ellipse cx="15" cy="29" rx="9" ry="9" fill="#e0e0e0"/>
+    <ellipse cx="65" cy="29" rx="9" ry="9" fill="#e0e0e0"/>
+    <ellipse cx="40" cy="48" rx="28" ry="25" fill="#9e9e9e" stroke="#757575" stroke-width="1.5"/>
+    <ellipse cx="40" cy="51" rx="11" ry="9" fill="#546e7a" stroke="#37474f" stroke-width="1.5"/>
+    <ellipse cx="35" cy="52" rx="3" ry="2.5" fill="#37474f"/>
+    <ellipse cx="45" cy="52" rx="3" ry="2.5" fill="#37474f"/>
+    <ellipse cx="28" cy="40" rx="5" ry="5" fill="#1a1a1a"/>
+    <ellipse cx="52" cy="40" rx="5" ry="5" fill="#1a1a1a"/>
+    <circle cx="30" cy="39" r="2" fill="#fff"/>
+    <circle cx="54" cy="39" r="2" fill="#fff"/>
+    <path d="M36,60 Q40,64 44,60" stroke="#757575" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <ellipse cx="40" cy="83" rx="22" ry="15" fill="#9e9e9e" stroke="#757575" stroke-width="1.5"/>
+    <ellipse cx="40" cy="83" rx="13" ry="9" fill="#e0e0e0"/>
+    <ellipse cx="20" cy="79" rx="6" ry="9" fill="#9e9e9e" stroke="#757575" stroke-width="1.5" transform="rotate(-20 20 79)"/>
+    <ellipse cx="60" cy="79" rx="6" ry="9" fill="#9e9e9e" stroke="#757575" stroke-width="1.5" transform="rotate(20 60 79)"/>
+    <ellipse cx="62" cy="67" rx="6" ry="10" fill="#4caf50" stroke="#388e3c" stroke-width="1" transform="rotate(30 62 67)"/>
+  </svg>`,
+  '두바이': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <path d="M20,10 Q20,2 40,2 Q60,2 60,10 Q65,15 60,22 Q55,30 50,28 Q45,34 40,33 Q35,34 30,28 Q25,30 20,22 Q15,15 20,10Z" fill="#f0f0f0" stroke="#ccc" stroke-width="1"/>
+    <line x1="20" y1="10" x2="60" y2="10" stroke="#e63946" stroke-width="2.5"/>
+    <line x1="20" y1="14" x2="60" y2="14" stroke="#e63946" stroke-width="2.5"/>
+    <ellipse cx="40" cy="24" rx="18" ry="15" fill="#c8a96a" stroke="#a08040" stroke-width="1.5"/>
+    <ellipse cx="40" cy="33" rx="11" ry="8" fill="#d4b278" stroke="#a08040" stroke-width="1.5"/>
+    <ellipse cx="36" cy="35" rx="2.5" ry="1.5" fill="#7a5c20"/>
+    <ellipse cx="44" cy="35" rx="2.5" ry="1.5" fill="#7a5c20"/>
+    <ellipse cx="31" cy="20" rx="4" ry="4.5" fill="#4a3010"/>
+    <ellipse cx="49" cy="20" rx="4" ry="4.5" fill="#4a3010"/>
+    <line x1="28" y1="16" x2="31" y2="12" stroke="#4a3010" stroke-width="1.5"/>
+    <line x1="31" y1="15" x2="33" y2="11" stroke="#4a3010" stroke-width="1.5"/>
+    <line x1="46" y1="15" x2="45" y2="11" stroke="#4a3010" stroke-width="1.5"/>
+    <line x1="49" y1="15" x2="51" y2="11" stroke="#4a3010" stroke-width="1.5"/>
+    <rect x="33" y="40" width="14" height="18" rx="5" fill="#c8a96a" stroke="#a08040" stroke-width="1.5"/>
+    <ellipse cx="40" cy="71" rx="25" ry="17" fill="#c8a96a" stroke="#a08040" stroke-width="1.5"/>
+    <ellipse cx="40" cy="60" rx="12" ry="9" fill="#b89450" stroke="#a08040" stroke-width="1.5"/>
+    <rect x="20" y="82" width="10" height="17" rx="4" fill="#c8a96a" stroke="#a08040" stroke-width="1.5"/>
+    <rect x="50" y="82" width="10" height="17" rx="4" fill="#c8a96a" stroke="#a08040" stroke-width="1.5"/>
+  </svg>`,
+  '싱가포르': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <ellipse cx="40" cy="35" rx="34" ry="30" fill="#c8a500" stroke="#a08000" stroke-width="1.5"/>
+    <ellipse cx="40" cy="33" rx="26" ry="24" fill="#d4a800"/>
+    <ellipse cx="40" cy="31" rx="20" ry="19" fill="#f5e8c0" stroke="#c8a500" stroke-width="1.5"/>
+    <ellipse cx="31" cy="27" rx="4.5" ry="5" fill="#4a3010"/>
+    <ellipse cx="49" cy="27" rx="4.5" ry="5" fill="#4a3010"/>
+    <circle cx="32" cy="26" r="1.5" fill="#fff"/>
+    <circle cx="50" cy="26" r="1.5" fill="#fff"/>
+    <ellipse cx="40" cy="34" rx="4" ry="2.5" fill="#a08000"/>
+    <path d="M33,39 Q40,44 47,39" stroke="#a08000" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M40,44 Q35,53 30,57 Q38,54 40,59 Q42,54 50,57 Q45,53 40,44Z" fill="#60a5fa" stroke="#3b82f6" stroke-width="1"/>
+    <path d="M18,66 Q10,73 12,83 Q20,78 30,83 Q40,86 50,83 Q60,78 68,83 Q70,73 62,66 Q52,70 40,70 Q28,70 18,66Z" fill="#3b82f6" stroke="#1d4ed8" stroke-width="1.5"/>
+    <path d="M30,70 Q33,66 36,70" stroke="#60a5fa" stroke-width="1" fill="none"/>
+    <path d="M40,70 Q43,66 46,70" stroke="#60a5fa" stroke-width="1" fill="none"/>
+    <path d="M50,70 Q53,66 56,70" stroke="#60a5fa" stroke-width="1" fill="none"/>
+    <path d="M12,83 Q5,87 8,95 Q15,89 25,94 Q35,97 40,95 Q45,97 55,94 Q65,89 72,95 Q75,87 68,83" fill="#2563eb" stroke="#1d4ed8" stroke-width="1.5"/>
+  </svg>`,
+  '베이징': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <ellipse cx="20" cy="23" rx="13" ry="13" fill="#222" stroke="#111" stroke-width="1.5"/>
+    <ellipse cx="60" cy="23" rx="13" ry="13" fill="#222" stroke="#111" stroke-width="1.5"/>
+    <ellipse cx="40" cy="46" rx="28" ry="26" fill="#f5f5f5" stroke="#ddd" stroke-width="1.5"/>
+    <ellipse cx="28" cy="40" rx="10" ry="9" fill="#222"/>
+    <ellipse cx="52" cy="40" rx="10" ry="9" fill="#222"/>
+    <ellipse cx="28" cy="40" rx="6" ry="6" fill="#fff"/>
+    <ellipse cx="52" cy="40" rx="6" ry="6" fill="#fff"/>
+    <circle cx="28" cy="40" r="3.5" fill="#111"/>
+    <circle cx="52" cy="40" r="3.5" fill="#111"/>
+    <circle cx="29" cy="39" r="1.5" fill="#fff"/>
+    <circle cx="53" cy="39" r="1.5" fill="#fff"/>
+    <ellipse cx="40" cy="51" rx="5" ry="3.5" fill="#555"/>
+    <path d="M36,55 Q40,59 44,55" stroke="#555" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <ellipse cx="40" cy="83" rx="22" ry="15" fill="#f5f5f5" stroke="#ddd" stroke-width="1.5"/>
+    <ellipse cx="19" cy="77" rx="9" ry="12" fill="#222" stroke="#111" stroke-width="1.5" transform="rotate(-20 19 77)"/>
+    <ellipse cx="61" cy="77" rx="9" ry="12" fill="#222" stroke="#111" stroke-width="1.5" transform="rotate(20 61 77)"/>
+    <rect x="60" y="60" width="5" height="28" rx="2" fill="#6ab04c" stroke="#4a8035" stroke-width="1"/>
+    <line x1="56" y1="68" x2="67" y2="68" stroke="#6ab04c" stroke-width="2"/>
+    <line x1="56" y1="76" x2="67" y2="76" stroke="#6ab04c" stroke-width="2"/>
+  </svg>`,
+  '뭄바이': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <ellipse cx="12" cy="40" rx="14" ry="18" fill="#9e9e9e" stroke="#757575" stroke-width="1.5"/>
+    <ellipse cx="68" cy="40" rx="14" ry="18" fill="#9e9e9e" stroke="#757575" stroke-width="1.5"/>
+    <ellipse cx="12" cy="40" rx="10" ry="13" fill="#bdbdbd"/>
+    <ellipse cx="68" cy="40" rx="10" ry="13" fill="#bdbdbd"/>
+    <ellipse cx="40" cy="38" rx="26" ry="24" fill="#9e9e9e" stroke="#757575" stroke-width="1.5"/>
+    <path d="M30,56 Q24,62 26,72 Q28,80 34,80 Q38,80 38,74 Q38,66 34,62" fill="#9e9e9e" stroke="#757575" stroke-width="1.5"/>
+    <ellipse cx="34" cy="80" rx="4" ry="3" fill="#9e9e9e" stroke="#757575" stroke-width="1"/>
+    <circle cx="40" cy="28" r="5" fill="#e63946"/>
+    <circle cx="40" cy="28" r="3" fill="#ff6b6b"/>
+    <path d="M18,22 Q28,14 40,14 Q52,14 62,22" stroke="#ffd700" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <ellipse cx="28" cy="36" rx="4" ry="5" fill="#333"/>
+    <ellipse cx="52" cy="36" rx="4" ry="5" fill="#333"/>
+    <circle cx="29" cy="35" r="1.5" fill="#fff"/>
+    <circle cx="53" cy="35" r="1.5" fill="#fff"/>
+    <ellipse cx="40" cy="82" rx="22" ry="15" fill="#9e9e9e" stroke="#757575" stroke-width="1.5"/>
+    <path d="M20,74 Q40,68 60,74 Q60,82 40,84 Q20,82 20,74Z" fill="#e63946" stroke="#c0392b" stroke-width="1"/>
+    <rect x="22" y="88" width="10" height="11" rx="4" fill="#9e9e9e" stroke="#757575" stroke-width="1.5"/>
+    <rect x="48" y="88" width="10" height="11" rx="4" fill="#9e9e9e" stroke="#757575" stroke-width="1.5"/>
+  </svg>`,
+  '카이로': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <path d="M18,8 Q20,2 40,2 Q60,2 62,8 L65,34 Q55,37 50,44 L50,58 L30,58 L30,44 Q25,37 15,34Z" fill="#1a5f9e" stroke="#0d3d6b" stroke-width="1.5"/>
+    <line x1="20" y1="14" x2="18" y2="30" stroke="#ffd700" stroke-width="2.5"/>
+    <line x1="25" y1="10" x2="23" y2="28" stroke="#ffd700" stroke-width="2.5"/>
+    <line x1="55" y1="10" x2="57" y2="28" stroke="#ffd700" stroke-width="2.5"/>
+    <line x1="60" y1="14" x2="62" y2="30" stroke="#ffd700" stroke-width="2.5"/>
+    <ellipse cx="40" cy="30" rx="20" ry="22" fill="#c8956c" stroke="#a06040" stroke-width="1.5"/>
+    <rect x="20" y="8" width="40" height="6" rx="2" fill="#ffd700" stroke="#c8a500" stroke-width="1"/>
+    <ellipse cx="30" cy="28" rx="5" ry="4" fill="#fff"/>
+    <ellipse cx="50" cy="28" rx="5" ry="4" fill="#fff"/>
+    <circle cx="30" cy="28" r="3" fill="#333"/>
+    <circle cx="50" cy="28" r="3" fill="#333"/>
+    <line x1="24" y1="28" x2="36" y2="28" stroke="#111" stroke-width="1"/>
+    <line x1="44" y1="28" x2="56" y2="28" stroke="#111" stroke-width="1"/>
+    <path d="M38,33 Q40,37 42,33" stroke="#a06040" stroke-width="1.5" fill="none"/>
+    <path d="M33,38 Q40,43 47,38" stroke="#c06040" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M20,52 Q20,60 40,62 Q60,60 60,52 Q50,48 40,48 Q30,48 20,52Z" fill="#ffd700" stroke="#c8a500" stroke-width="1.5"/>
+    <path d="M24,54 Q40,58 56,54" stroke="#c8a500" stroke-width="1"/>
+    <path d="M24,62 L22,100 L58,100 L56,62 Q48,58 40,58 Q32,58 24,62Z" fill="#1a5f9e" stroke="#0d3d6b" stroke-width="1.5"/>
+    <line x1="40" y1="70" x2="40" y2="90" stroke="#ffd700" stroke-width="2"/>
+    <line x1="33" y1="76" x2="47" y2="76" stroke="#ffd700" stroke-width="2"/>
+    <ellipse cx="40" cy="70" rx="5" ry="6" fill="none" stroke="#ffd700" stroke-width="2"/>
+  </svg>`,
+  '모스크바': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <ellipse cx="18" cy="29" rx="12" ry="12" fill="#8B4513" stroke="#6B3410" stroke-width="1.5"/>
+    <ellipse cx="62" cy="29" rx="12" ry="12" fill="#8B4513" stroke="#6B3410" stroke-width="1.5"/>
+    <ellipse cx="18" cy="29" rx="7" ry="7" fill="#a0522d"/>
+    <ellipse cx="62" cy="29" rx="7" ry="7" fill="#a0522d"/>
+    <ellipse cx="40" cy="22" rx="30" ry="13" fill="#8B0000" stroke="#600000" stroke-width="1.5"/>
+    <ellipse cx="12" cy="26" rx="10" ry="8" fill="#8B0000" stroke="#600000" stroke-width="1.5"/>
+    <ellipse cx="68" cy="26" rx="10" ry="8" fill="#8B0000" stroke="#600000" stroke-width="1.5"/>
+    <ellipse cx="40" cy="14" rx="22" ry="8" fill="#a00000"/>
+    <polygon points="40,9 42,15 48,15 43,19 45,25 40,21 35,25 37,19 32,15 38,15" fill="#ffd700" stroke="#c8a500" stroke-width="0.5"/>
+    <ellipse cx="40" cy="48" rx="26" ry="24" fill="#8B4513" stroke="#6B3410" stroke-width="1.5"/>
+    <ellipse cx="40" cy="55" rx="13" ry="10" fill="#a0522d" stroke="#6B3410" stroke-width="1"/>
+    <ellipse cx="40" cy="51" rx="5" ry="3.5" fill="#4a2010"/>
+    <ellipse cx="28" cy="44" rx="4.5" ry="5" fill="#2a1a0a"/>
+    <ellipse cx="52" cy="44" rx="4.5" ry="5" fill="#2a1a0a"/>
+    <circle cx="30" cy="43" r="1.5" fill="#fff"/>
+    <circle cx="54" cy="43" r="1.5" fill="#fff"/>
+    <path d="M34,58 Q40,62 46,58" stroke="#4a2010" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <ellipse cx="40" cy="83" rx="22" ry="15" fill="#8B4513" stroke="#6B3410" stroke-width="1.5"/>
+    <ellipse cx="40" cy="83" rx="13" ry="9" fill="#a0522d"/>
+    <ellipse cx="18" cy="80" rx="10" ry="13" fill="#8B4513" stroke="#6B3410" stroke-width="1.5" transform="rotate(-15 18 80)"/>
+    <ellipse cx="62" cy="80" rx="10" ry="13" fill="#8B4513" stroke="#6B3410" stroke-width="1.5" transform="rotate(15 62 80)"/>
+  </svg>`,
+  '상파울루': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <ellipse cx="40" cy="68" rx="24" ry="25" fill="#111" stroke="#000" stroke-width="1.5"/>
+    <ellipse cx="40" cy="68" rx="15" ry="17" fill="#f5f5f5"/>
+    <ellipse cx="40" cy="36" rx="22" ry="22" fill="#111" stroke="#000" stroke-width="1.5"/>
+    <ellipse cx="32" cy="32" rx="9" ry="9" fill="#27ae60"/>
+    <circle cx="32" cy="32" r="7" fill="#111"/>
+    <circle cx="34" cy="30" r="2" fill="#fff"/>
+    <path d="M40,30 Q68,26 70,40 Q68,55 40,49Z" fill="#ffd700" stroke="#f0a500" stroke-width="1.5"/>
+    <path d="M52,28 Q62,26 68,33" stroke="#e63946" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M55,42 Q64,43 70,40" stroke="#27ae60" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <ellipse cx="70" cy="40" rx="5" ry="6" fill="#e63946" stroke="#c0392b" stroke-width="1"/>
+    <path d="M18,63 Q12,73 18,83" stroke="#333" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M62,63 Q68,73 62,83" stroke="#333" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <line x1="32" y1="93" x2="28" y2="100" stroke="#f0a500" stroke-width="2" stroke-linecap="round"/>
+    <line x1="36" y1="94" x2="34" y2="100" stroke="#f0a500" stroke-width="2" stroke-linecap="round"/>
+    <line x1="48" y1="94" x2="46" y2="100" stroke="#f0a500" stroke-width="2" stroke-linecap="round"/>
+    <line x1="52" y1="93" x2="56" y2="100" stroke="#f0a500" stroke-width="2" stroke-linecap="round"/>
+  </svg>`,
+  '멕시코시티': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <ellipse cx="40" cy="22" rx="38" ry="9" fill="#d4a017" stroke="#a07810" stroke-width="1.5"/>
+    <path d="M12,22 Q14,8 40,5 Q66,8 68,22" fill="#e8b820" stroke="#a07810" stroke-width="1.5"/>
+    <path d="M16,20 Q40,14 64,20" stroke="#e63946" stroke-width="3" fill="none"/>
+    <circle cx="40" cy="5" r="3" fill="#e63946"/>
+    <ellipse cx="40" cy="43" rx="20" ry="20" fill="#d4a56a" stroke="#a07030" stroke-width="1.5"/>
+    <path d="M30,51 Q35,48 40,50 Q45,48 50,51" stroke="#333" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <ellipse cx="31" cy="41" rx="4" ry="4.5" fill="#3d2b1a"/>
+    <ellipse cx="49" cy="41" rx="4" ry="4.5" fill="#3d2b1a"/>
+    <circle cx="32" cy="40" r="1.5" fill="#fff"/>
+    <circle cx="50" cy="40" r="1.5" fill="#fff"/>
+    <ellipse cx="40" cy="47" rx="3.5" ry="2.5" fill="#b07840"/>
+    <path d="M33,54 Q40,61 47,54" stroke="#3d2b1a" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M15,63 Q18,100 40,100 Q62,100 65,63 Q55,57 40,56 Q25,57 15,63Z" fill="#27ae60" stroke="#1a7a40" stroke-width="1.5"/>
+    <line x1="15" y1="71" x2="65" y2="71" stroke="#e63946" stroke-width="2.5"/>
+    <line x1="15" y1="79" x2="65" y2="79" stroke="#ffd700" stroke-width="2.5"/>
+    <line x1="15" y1="87" x2="65" y2="87" stroke="#e63946" stroke-width="2.5"/>
+    <ellipse cx="40" cy="63" rx="8" ry="5" fill="#d4a56a" stroke="#1a7a40" stroke-width="1"/>
+  </svg>`,
+  '토론토': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <ellipse cx="40" cy="23" rx="34" ry="8" fill="#6b4226" stroke="#4a2c18" stroke-width="1.5"/>
+    <path d="M14,23 Q16,7 40,5 Q64,7 66,23" fill="#8B5E3C" stroke="#4a2c18" stroke-width="1.5"/>
+    <path d="M24,11 Q32,7 40,7 Q48,7 56,11" stroke="#6b4226" stroke-width="2" fill="none"/>
+    <line x1="14" y1="21" x2="66" y2="21" stroke="#4a2c18" stroke-width="3"/>
+    <ellipse cx="40" cy="43" rx="22" ry="22" fill="#fde8c8" stroke="#d4a888" stroke-width="1.5"/>
+    <ellipse cx="30" cy="41" rx="4.5" ry="5" fill="#3d2b1a"/>
+    <ellipse cx="50" cy="41" rx="4.5" ry="5" fill="#3d2b1a"/>
+    <circle cx="31" cy="40" r="1.5" fill="#fff"/>
+    <circle cx="51" cy="40" r="1.5" fill="#fff"/>
+    <ellipse cx="40" cy="47" rx="3.5" ry="2.5" fill="#e5b89b"/>
+    <path d="M35,52 Q40,56 45,52" stroke="#c07060" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M18,62 L18,100 L62,100 L62,62 Q50,56 40,56 Q30,56 18,62Z" fill="#cc0000" stroke="#990000" stroke-width="1.5"/>
+    <rect x="18" y="78" width="44" height="5" fill="#ffd700"/>
+    <circle cx="40" cy="70" r="7" fill="#ffd700" stroke="#c8a500" stroke-width="1"/>
+    <path d="M40,64 L41.5,68 L46,67 L43,70 L45,74 L40,72 L35,74 L37,70 L34,67 L38.5,68Z" fill="#cc0000"/>
+    <rect x="14" y="61" width="10" height="5" rx="2" fill="#ffd700"/>
+    <rect x="56" y="61" width="10" height="5" rx="2" fill="#ffd700"/>
+  </svg>`,
+  '베를린': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <ellipse cx="40" cy="64" rx="35" ry="14" fill="#8B4513" stroke="#6B3410" stroke-width="1.5"/>
+    <ellipse cx="40" cy="67" rx="25" ry="8" fill="#cd853f"/>
+    <ellipse cx="18" cy="46" rx="18" ry="16" fill="#8B4513" stroke="#6B3410" stroke-width="1.5"/>
+    <ellipse cx="10" cy="52" rx="12" ry="8" fill="#a0522d" stroke="#6B3410" stroke-width="1"/>
+    <ellipse cx="4" cy="52" rx="4" ry="3" fill="#333" stroke="#222" stroke-width="1"/>
+    <ellipse cx="20" cy="42" rx="4.5" ry="5" fill="#4a2010"/>
+    <circle cx="21" cy="41" r="1.5" fill="#fff"/>
+    <path d="M16,38 Q20,36 24,38" stroke="#4a2010" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <ellipse cx="28" cy="48" rx="8" ry="14" fill="#6B3410" stroke="#4a2010" stroke-width="1" transform="rotate(20 28 48)"/>
+    <path d="M72,58 Q80,50 76,44" stroke="#6B3410" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <rect x="20" y="74" width="8" height="14" rx="4" fill="#8B4513" stroke="#6B3410" stroke-width="1.5"/>
+    <rect x="30" y="74" width="8" height="14" rx="4" fill="#8B4513" stroke="#6B3410" stroke-width="1.5"/>
+    <rect x="44" y="74" width="8" height="14" rx="4" fill="#8B4513" stroke="#6B3410" stroke-width="1.5"/>
+    <rect x="54" y="74" width="8" height="14" rx="4" fill="#8B4513" stroke="#6B3410" stroke-width="1.5"/>
+    <ellipse cx="18" cy="60" rx="12" ry="4" fill="#333"/>
+    <path d="M9,58 Q18,54 27,58" stroke="#cc0000" stroke-width="2" fill="none"/>
+    <path d="M8,61 Q18,57 28,61" stroke="#ffd700" stroke-width="2" fill="none"/>
+  </svg>`,
+  '이스탄불': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <path d="M22,23 L22,11 Q22,4 40,4 Q58,4 58,11 L58,23Z" fill="#cc0000" stroke="#990000" stroke-width="1.5"/>
+    <ellipse cx="40" cy="23" rx="18" ry="5" fill="#aa0000"/>
+    <line x1="40" y1="5" x2="38" y2="23" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+    <polygon points="20,25 14,13 26,21" fill="#fca5a5" stroke="#d4a888" stroke-width="1"/>
+    <polygon points="60,25 66,13 54,21" fill="#fca5a5" stroke="#d4a888" stroke-width="1"/>
+    <ellipse cx="40" cy="47" rx="26" ry="24" fill="#fde8c8" stroke="#d4a888" stroke-width="1.5"/>
+    <polygon points="20,29 15,17 27,25" fill="#fca5a5"/>
+    <polygon points="60,29 65,17 53,25" fill="#fca5a5"/>
+    <ellipse cx="30" cy="43" rx="5.5" ry="6" fill="#27ae60"/>
+    <ellipse cx="50" cy="43" rx="5.5" ry="6" fill="#27ae60"/>
+    <ellipse cx="30" cy="43" rx="2.5" ry="5" fill="#111"/>
+    <ellipse cx="50" cy="43" rx="2.5" ry="5" fill="#111"/>
+    <circle cx="31" cy="41" r="1.5" fill="#fff"/>
+    <circle cx="51" cy="41" r="1.5" fill="#fff"/>
+    <ellipse cx="40" cy="51" rx="4" ry="3" fill="#f9a8d4"/>
+    <path d="M36,54 Q40,58 44,54" stroke="#c07060" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <line x1="13" y1="49" x2="33" y2="51" stroke="#ddd" stroke-width="1"/>
+    <line x1="13" y1="53" x2="33" y2="53" stroke="#ddd" stroke-width="1"/>
+    <line x1="47" y1="51" x2="67" y2="49" stroke="#ddd" stroke-width="1"/>
+    <line x1="47" y1="53" x2="67" y2="53" stroke="#ddd" stroke-width="1"/>
+    <ellipse cx="40" cy="82" rx="20" ry="14" fill="#1a5f9e" stroke="#0d3d6b" stroke-width="1.5"/>
+    <path d="M40,70 Q45,75 40,80 Q35,75 40,70Z" fill="#ffd700" stroke="#c8a500" stroke-width="0.5"/>
+    <path d="M30,74 Q35,79 30,84 Q25,79 30,74Z" fill="#ffd700" stroke="#c8a500" stroke-width="0.5"/>
+    <path d="M50,74 Q55,79 50,84 Q45,79 50,74Z" fill="#ffd700" stroke="#c8a500" stroke-width="0.5"/>
+  </svg>`,
+  '방콕': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <path d="M22,20 L24,11 L28,17 L32,7 L36,15 L40,5 L44,15 L48,7 L52,17 L56,11 L58,20Z" fill="#ffd700" stroke="#c8a500" stroke-width="1"/>
+    <rect x="20" y="19" width="40" height="6" rx="3" fill="#ffd700" stroke="#c8a500" stroke-width="1"/>
+    <circle cx="40" cy="22" r="3" fill="#e63946"/>
+    <circle cx="30" cy="22" r="2" fill="#e63946"/>
+    <circle cx="50" cy="22" r="2" fill="#e63946"/>
+    <ellipse cx="10" cy="48" rx="13" ry="16" fill="#a8a8a8" stroke="#888" stroke-width="1.5"/>
+    <ellipse cx="70" cy="48" rx="13" ry="16" fill="#a8a8a8" stroke="#888" stroke-width="1.5"/>
+    <ellipse cx="10" cy="48" rx="9" ry="11" fill="#c0c0c0"/>
+    <ellipse cx="70" cy="48" rx="9" ry="11" fill="#c0c0c0"/>
+    <ellipse cx="40" cy="46" rx="26" ry="24" fill="#b8b8b8" stroke="#888" stroke-width="1.5"/>
+    <path d="M28,60 Q20,68 22,80 Q24,86 30,85 Q35,84 34,77 Q33,70 30,66" fill="#b8b8b8" stroke="#888" stroke-width="1.5"/>
+    <ellipse cx="30" cy="85" rx="5" ry="3" fill="#b8b8b8" stroke="#888" stroke-width="1"/>
+    <ellipse cx="28" cy="44" rx="4" ry="4.5" fill="#333"/>
+    <ellipse cx="52" cy="44" rx="4" ry="4.5" fill="#333"/>
+    <circle cx="29" cy="43" r="1.5" fill="#fff"/>
+    <circle cx="53" cy="43" r="1.5" fill="#fff"/>
+    <path d="M16,68 Q28,62 40,62 Q52,62 64,68 Q64,75 40,78 Q16,75 16,68Z" fill="#cc0000" stroke="#990000" stroke-width="1"/>
+    <path d="M18,68 Q40,64 62,68" stroke="#ffd700" stroke-width="2" fill="none"/>
+    <ellipse cx="40" cy="88" rx="22" ry="11" fill="#b8b8b8" stroke="#888" stroke-width="1.5"/>
+    <rect x="22" y="92" width="10" height="8" rx="4" fill="#b8b8b8" stroke="#888" stroke-width="1.5"/>
+    <rect x="48" y="92" width="10" height="8" rx="4" fill="#b8b8b8" stroke="#888" stroke-width="1.5"/>
+  </svg>`,
+  '라고스': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <ellipse cx="40" cy="14" rx="22" ry="10" fill="#27ae60" stroke="#1a7a40" stroke-width="1.5"/>
+    <ellipse cx="40" cy="14" rx="18" ry="7" fill="#2ecc71"/>
+    <path d="M28,14 Q34,10 40,14 Q46,10 52,14" stroke="#ffd700" stroke-width="1.5" fill="none"/>
+    <ellipse cx="40" cy="36" rx="22" ry="22" fill="#5c3317" stroke="#3d2210" stroke-width="1.5"/>
+    <ellipse cx="30" cy="33" rx="4.5" ry="5" fill="#1a0f00"/>
+    <ellipse cx="50" cy="33" rx="4.5" ry="5" fill="#1a0f00"/>
+    <circle cx="31" cy="32" r="1.5" fill="#fff"/>
+    <circle cx="51" cy="32" r="1.5" fill="#fff"/>
+    <ellipse cx="40" cy="40" rx="5" ry="3.5" fill="#3d2210"/>
+    <path d="M30,46 Q40,54 50,46" stroke="#f5deb3" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M5,58 Q8,100 40,100 Q72,100 75,58 Q60,54 40,53 Q20,54 5,58Z" fill="#27ae60" stroke="#1a7a40" stroke-width="1.5"/>
+    <path d="M22,58 Q24,100 40,100 Q56,100 58,58 Q50,54 40,53 Q30,54 22,58Z" fill="#ffd700" stroke="#c8a500" stroke-width="1"/>
+    <path d="M30,62 Q40,58 50,62" stroke="#1a7a40" stroke-width="2" fill="none"/>
+    <path d="M28,68 Q40,64 52,68" stroke="#1a7a40" stroke-width="1.5" fill="none"/>
+    <circle cx="40" cy="72" r="4" fill="#cc0000" stroke="#990000" stroke-width="1"/>
+    <ellipse cx="10" cy="70" rx="10" ry="15" fill="#27ae60" stroke="#1a7a40" stroke-width="1.5"/>
+    <ellipse cx="70" cy="70" rx="10" ry="15" fill="#27ae60" stroke="#1a7a40" stroke-width="1.5"/>
+  </svg>`,
+  '부에노스아이레스': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+    <ellipse cx="40" cy="24" rx="36" ry="9" fill="#3d2b1a" stroke="#2a1a0a" stroke-width="1.5"/>
+    <path d="M14,24 Q16,9 40,7 Q64,9 66,24" fill="#4a3525" stroke="#2a1a0a" stroke-width="1.5"/>
+    <path d="M14,24 Q16,30 22,32" stroke="#c8a500" stroke-width="1.5" fill="none"/>
+    <path d="M66,24 Q64,30 58,32" stroke="#c8a500" stroke-width="1.5" fill="none"/>
+    <ellipse cx="40" cy="44" rx="20" ry="20" fill="#d4a56a" stroke="#a07030" stroke-width="1.5"/>
+    <ellipse cx="31" cy="42" rx="4" ry="4.5" fill="#3d2b1a"/>
+    <ellipse cx="49" cy="42" rx="4" ry="4.5" fill="#3d2b1a"/>
+    <circle cx="32" cy="41" r="1.5" fill="#fff"/>
+    <circle cx="50" cy="41" r="1.5" fill="#fff"/>
+    <ellipse cx="40" cy="48" rx="3.5" ry="2.5" fill="#b07840"/>
+    <path d="M34,53 Q40,58 46,53" stroke="#3d2b1a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M24,60 Q30,54 40,56 Q50,54 56,60 Q48,66 40,65 Q32,66 24,60Z" fill="#75b2dd" stroke="#4a8ab8" stroke-width="1"/>
+    <path d="M8,64 Q10,100 40,100 Q70,100 72,64 Q58,58 40,57 Q22,58 8,64Z" fill="#75b2dd" stroke="#4a8ab8" stroke-width="1.5"/>
+    <path d="M22,64 Q26,100 40,100 Q54,100 58,64 Q50,60 40,59 Q30,60 22,64Z" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/>
+    <circle cx="40" cy="80" r="8" fill="#ffd700" stroke="#c8a500" stroke-width="1"/>
+    <circle cx="40" cy="80" r="5" fill="#f0c040"/>
+    <line x1="40" y1="70" x2="40" y2="67" stroke="#ffd700" stroke-width="1.5"/>
+    <line x1="40" y1="90" x2="40" y2="93" stroke="#ffd700" stroke-width="1.5"/>
+    <line x1="30" y1="80" x2="27" y2="80" stroke="#ffd700" stroke-width="1.5"/>
+    <line x1="50" y1="80" x2="53" y2="80" stroke="#ffd700" stroke-width="1.5"/>
+    <line x1="33" y1="73" x2="31" y2="71" stroke="#ffd700" stroke-width="1.5"/>
+    <line x1="47" y1="73" x2="49" y2="71" stroke="#ffd700" stroke-width="1.5"/>
+    <line x1="33" y1="87" x2="31" y2="89" stroke="#ffd700" stroke-width="1.5"/>
+    <line x1="47" y1="87" x2="49" y2="89" stroke="#ffd700" stroke-width="1.5"/>
+  </svg>`,
+};
+
+/* ─────────────── 카드 렌더링 ─────────────── */
+function sortedIndices() {
+  const idx = cities.map((_, i) => i);
+  if (sort === 'default')    return idx;
+  if (sort === 'name')       return idx.sort((a,b) => cities[a].name.localeCompare(cities[b].name, 'ko'));
+  if (sort === 'temp-desc')  return idx.sort((a,b) => (cities[b].data?.temp ?? -999) - (cities[a].data?.temp ?? -999));
+  if (sort === 'temp-asc')   return idx.sort((a,b) => (cities[a].data?.temp ?? 999)  - (cities[b].data?.temp ?? 999));
+  return idx;
+}
+
+function renderAll() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  sortedIndices().forEach(i => {
+    const el = document.createElement('div');
+    el.id = `card-${i}`;
+    grid.appendChild(el);
+    renderCard(i, el);
+  });
+  if (view === 'map') refreshAllMarkers();
+}
+
+function renderCard(i, el) {
+  el = el || document.getElementById(`card-${i}`);
+  if (!el) return;
+  const city = cities[i];
+
+  if (!city.data && !city.error) {
+    el.className = 'card card-skeleton';
+    el.innerHTML = `
+      <div class="sk-title skeleton"></div>
+      <div class="sk-sub skeleton"></div>
+      <div class="sk-icon skeleton"></div>
+      <div class="sk-temp skeleton"></div>
+      <div class="sk-desc skeleton"></div>
+      <div class="sk-meta">
+        <div class="skeleton"></div><div class="skeleton"></div>
+        <div class="skeleton"></div><div class="skeleton"></div>
+      </div>`;
+    return;
+  }
+
+  el.className = compareList.includes(i) ? 'card comparing' : 'card';
+
+  if (city.error) {
+    const mascotErr = MASCOTS[city.name] ?? '';
+    const tzErr = city.tz || '';
+    const timeErr = tzErr
+      ? new Date().toLocaleTimeString('ko-KR', { timeZone: tzErr, hour: '2-digit', minute: '2-digit' })
+      : '';
+    el.innerHTML = `
+      <button class="card-remove" onclick="removeCity(${i})" title="제거">✕</button>
+      <div class="card-city">${city.name}</div>
+      <div class="card-country">${city.country}</div>
+      ${timeErr ? `<div class="card-localtime" data-tz="${tzErr}">🕐 ${timeErr}</div>` : ''}
+      <div class="error-msg">⚠️ ${city.error}</div>
+      <div class="mascot">${mascotErr}</div>`;
+    return;
+  }
+
+  const d      = city.data;
+  const info   = wmoInfo(d.weatherCode);
+  const tc     = tempClass(d.temp);
+  const barW   = tempBarWidth(d.temp);
+  const barC   = tempBarColor(d.temp);
+  const mascot = MASCOTS[city.name] ?? '';
+  const tz = d.timezone || city.tz || '';
+  const localTime = tz
+    ? new Date().toLocaleTimeString('ko-KR', { timeZone: tz, hour: '2-digit', minute: '2-digit' })
+    : '';
+
+  el.innerHTML = `
+    <button class="card-remove" onclick="removeCity(${i})" title="제거">✕</button>
+    <div class="card-city">${city.name}</div>
+    <div class="card-country">${city.country}</div>
+    ${localTime ? `<div class="card-localtime" data-tz="${d.timezone}">🕐 ${localTime}</div>` : ''}
+    <div class="card-weather-icon">${info.icon}</div>
+    <div class="card-temp ${tc}">${toDisplay(d.temp)}</div>
+    <div class="card-desc">${info.desc}</div>
+    <div class="card-meta">
+      <div class="meta-item">
+        <div class="meta-label">체감온도</div>
+        <div class="meta-value">${toDisplay(d.feelsLike)}</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">습도</div>
+        <div class="meta-value">${d.humidity}%</div>
+      </div>
+      <div class="meta-item" style="grid-column:1/-1">
+        <div class="meta-label">풍속</div>
+        <div class="meta-value">${d.wind} m/s</div>
+      </div>
+    </div>
+    <div class="card-bar">
+      <div class="card-bar-fill" style="width:${barW};background:${barC}"></div>
+    </div>
+    <button class="card-compare-btn ${compareList.includes(i) ? 'active' : ''}" onclick="toggleCompare(${i})">${compareList.includes(i) ? '✓ 비교 중' : '+ 비교'}</button>
+    <div class="mascot">${mascot}</div>`;
+}
+
+/* ─────────────── 도시 제거 ─────────────── */
+function removeCity(i) {
+  if (cityMarkers[i]) { map.removeLayer(cityMarkers[i]); cityMarkers[i] = null; }
+  compareList = compareList.filter(ci => ci !== i).map(ci => ci > i ? ci - 1 : ci);
+  cities.splice(i, 1);
+  cityMarkers.splice(i, 1);
+  updateCompareBar();
+  renderAll();
+}
+
+/* ─────────────── 단위 & 테마 ─────────────── */
+function setUnit(u) {
+  unit = u;
+  document.getElementById('btnC').classList.toggle('active', u === 'C');
+  document.getElementById('btnF').classList.toggle('active', u === 'F');
+  renderAll();
+}
+
+function toggleTheme() {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  document.body.classList.toggle('light', theme === 'light');
+  document.getElementById('themeBtn').textContent = theme === 'dark' ? '☀️ 라이트' : '🌙 다크';
+  // 지도 타일 교체
+  if (map) {
+    tileLayerDark.remove();
+    tileLayerLight.remove();
+    if (theme === 'dark') tileLayerDark.addTo(map);
+    else                  tileLayerLight.addTo(map);
+  }
+}
+
+/* ─────────────── 정렬 ─────────────── */
+function setSort(s) {
+  sort = s;
+  document.querySelectorAll('.sort-bar .btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sort-' + s)?.classList.add('active');
+  renderAll();
+}
+
+/* ─────────────── 뷰 전환 ─────────────── */
+function setView(v) {
+  view = v;
+  document.getElementById('viewGrid').classList.toggle('active', v === 'grid');
+  document.getElementById('viewMap').classList.toggle('active',  v === 'map');
+  document.getElementById('sortBar').style.display   = v === 'grid' ? '' : 'none';
+  document.getElementById('grid').style.display      = v === 'grid' ? '' : 'none';
+  document.getElementById('map-wrap').style.display  = v === 'map'  ? 'block' : 'none';
+
+  if (v === 'map') {
+    // map이 숨겨진 상태에서 생성됐을 경우 크기 재계산
+    setTimeout(() => {
+      map.invalidateSize();
+      refreshAllMarkers();
+    }, 50);
+  }
+}
+
+/* ────────────────────────────────────────────
+   지도 (Leaflet)
+──────────────────────────────────────────── */
+let map, tileLayerDark, tileLayerLight;
+let cityMarkers = [];
+
+function initMap() {
+  map = L.map('map', {
+    center: [20, 10],
+    zoom: 2,
+    minZoom: 1,
+    maxZoom: 10,
+    zoomControl: true,
+  });
+
+  // 다크 타일
+  tileLayerDark = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    { attribution: '&copy; <a href="https://carto.com/attribution">CARTO</a>', subdomains: 'abcd', maxZoom: 19 }
+  );
+  // 라이트 타일
+  tileLayerLight = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    { attribution: '&copy; <a href="https://carto.com/attribution">CARTO</a>', subdomains: 'abcd', maxZoom: 19 }
+  );
+
+  tileLayerDark.addTo(map); // 기본: 다크
+
+  // 초기 마커 (로딩 중 상태)
+  cities.forEach((_, i) => { cityMarkers.push(null); addMarker(i); });
+}
+
+/* 마커 HTML 생성 */
+function markerHTML(city) {
+  if (!city.data) {
+    return `<div class="weather-marker">
+      <div class="weather-marker-badge" style="background:#475569">⏳</div>
+      <div class="weather-marker-tail"></div>
+    </div>`;
+  }
+  const info  = wmoInfo(city.data.weatherCode);
+  const color = tempBarColor(city.data.temp);
+  const temp  = toDisplay(city.data.temp);
+  return `<div class="weather-marker">
+    <div class="weather-marker-badge" style="background:${color}">
+      <span class="m-icon">${info.icon}</span> ${temp}
+    </div>
+    <div class="weather-marker-tail"></div>
+  </div>`;
+}
+
+/* 팝업 HTML 생성 */
+function popupHTML(city) {
+  if (!city.data) return `<div class="popup-inner"><div class="popup-city">${city.name}</div><div style="color:#94a3b8;font-size:0.85rem;margin-top:8px">로딩 중...</div></div>`;
+  const d    = city.data;
+  const info = wmoInfo(d.weatherCode);
+  const tc   = tempClass(d.temp);
+  return `
+  <div class="popup-inner">
+    <div class="popup-city">${city.name}</div>
+    <div class="popup-country">${city.country}</div>
+    <div class="popup-main">
+      <div class="popup-icon">${info.icon}</div>
+      <div>
+        <div class="popup-temp ${tc}">${toDisplay(d.temp)}</div>
+        <div class="popup-desc">${info.desc}</div>
+      </div>
+    </div>
+    <div class="popup-grid">
+      <div class="popup-meta">
+        <div class="popup-meta-label">체감온도</div>
+        <div class="popup-meta-value">${toDisplay(d.feelsLike)}</div>
+      </div>
+      <div class="popup-meta">
+        <div class="popup-meta-label">습도</div>
+        <div class="popup-meta-value">${d.humidity}%</div>
+      </div>
+      <div class="popup-meta" style="grid-column:1/-1">
+        <div class="popup-meta-label">풍속</div>
+        <div class="popup-meta-value">${d.wind} m/s</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function addMarker(i) {
+  const city = cities[i];
+  const icon = L.divIcon({
+    className: '',
+    html: markerHTML(city),
+    iconAnchor: [0, 38],
+    popupAnchor: [28, -38],
+  });
+
+  const marker = L.marker([city.lat, city.lon], { icon })
+    .addTo(map)
+    .bindPopup(popupHTML(city), { maxWidth: 260, className: 'weather-popup' });
+
+  cityMarkers[i] = marker;
+}
+
+function updateMarker(i) {
+  if (!map) return;
+  const city   = cities[i];
+  const marker = cityMarkers[i];
+  if (!marker) { addMarker(i); return; }
+
+  // 아이콘 갱신
+  marker.setIcon(L.divIcon({
+    className: '',
+    html: markerHTML(city),
+    iconAnchor: [0, 38],
+    popupAnchor: [28, -38],
+  }));
+  // 팝업 갱신
+  marker.setPopupContent(popupHTML(city));
+}
+
+function refreshAllMarkers() {
+  cities.forEach((_, i) => {
+    if (cityMarkers[i]) {
+      updateMarker(i);
+    } else {
+      addMarker(i);
+    }
+  });
+}
+
+/* ─────────────── 도시 검색 (Open-Meteo Geocoding) ─────────────── */
+let searchTimer;
+const searchInput  = document.getElementById('searchInput');
+const autocomplete = document.getElementById('autocomplete');
+let geoResults = [];
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  const q = searchInput.value.trim();
+  if (q.length < 2) { autocomplete.style.display = 'none'; return; }
+  searchTimer = setTimeout(() => geocodeSearch(q), 300);
+});
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { autocomplete.style.display = 'none'; searchInput.value = ''; }
+});
+document.addEventListener('click', e => {
+  if (!document.getElementById('searchWrap').contains(e.target)) autocomplete.style.display = 'none';
+});
+
+async function geocodeSearch(q) {
+  try {
+    const res  = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=ko`);
+    const json = await res.json();
+    geoResults = json.results || [];
+    if (!geoResults.length) { autocomplete.style.display = 'none'; return; }
+    autocomplete.innerHTML = geoResults.map((r, i) => `
+      <div class="autocomplete-item" onclick="addCityFromGeo(${i})">
+        📍 ${r.name} &nbsp;<span style="color:var(--text-muted);font-size:0.8em">${r.country ?? ''} ${r.admin1 ?? ''}</span>
+      </div>`).join('');
+    autocomplete.style.display = 'block';
+  } catch { autocomplete.style.display = 'none'; }
+}
+
+async function addCityFromGeo(i) {
+  const r = geoResults[i];
+  if (!r) return;
+  autocomplete.style.display = 'none';
+  searchInput.value = '';
+
+  const newCity = { name: r.name, country: r.country ?? '', lat: r.latitude, lon: r.longitude, data: null, error: null };
+  const idx = cities.length;
+  cities.push(newCity);
+  cityMarkers.push(null);
+
+  renderAll();
+  if (map && newCity.lat && newCity.lon) {
+    try {
+      addMarker(idx);
+      map.flyTo([newCity.lat, newCity.lon], 5, { duration: 1.2 });
+    } catch(e) {
+      console.warn('map error:', e.message);
+    }
+  }
+
+  // 새 카드(스켈레톤)로 스크롤
+  const newEl = document.getElementById(`card-${idx}`);
+  if (newEl) newEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  try {
+    newCity.data = await fetchWeather(newCity);
+  } catch {
+    newCity.error = '데이터를 불러올 수 없습니다';
+  }
+  renderCard(idx);
+  updateMarker(idx);
+
+  // 완성된 카드로 다시 스크롤 + 하이라이트
+  const doneEl = document.getElementById(`card-${idx}`);
+  if (doneEl) {
+    doneEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    doneEl.style.transition = 'box-shadow 0.3s';
+    doneEl.style.boxShadow = '0 0 0 3px var(--accent)';
+    setTimeout(() => { doneEl.style.boxShadow = ''; }, 1500);
+  }
+}
+
+/* ─────────────── 비교 기능 ─────────────── */
+let compareList = [];
+
+function toggleCompare(i) {
+  const idx = compareList.indexOf(i);
+  if (idx === -1) {
+    if (compareList.length >= 4) { alert('최대 4개 도시까지 비교할 수 있습니다.'); return; }
+    compareList.push(i);
+  } else {
+    compareList.splice(idx, 1);
+  }
+  renderCard(i);
+  updateCompareBar();
+}
+
+function updateCompareBar() {
+  const bar   = document.getElementById('compareBar');
+  const chips = document.getElementById('compareChips');
+  if (compareList.length === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  chips.innerHTML = compareList.map(i => {
+    const c = cities[i];
+    return `<span class="compare-bar-chip">${c.name} <button onclick="toggleCompare(${i})" title="제거">✕</button></span>`;
+  }).join('');
+  document.getElementById('compareBtn').textContent = `📊 비교하기 (${compareList.length})`;
+}
+
+function clearCompare() {
+  const prev = [...compareList];
+  compareList = [];
+  prev.forEach(i => renderCard(i));
+  updateCompareBar();
+}
+
+function openCompareModal() {
+  if (compareList.length < 2) { alert('2개 이상 도시를 선택해주세요.'); return; }
+  document.getElementById('compareModalBody').innerHTML = buildCompareTable();
+  document.getElementById('compareModal').style.display = 'flex';
+}
+
+function closeCompareModal() {
+  document.getElementById('compareModal').style.display = 'none';
+}
+
+function buildCompareTable() {
+  const list = compareList.map(i => ({ i, city: cities[i] })).filter(x => x.city.data);
+  if (!list.length) return '<p style="color:var(--text-muted);padding:20px 0">날씨 데이터가 아직 없습니다. 잠시 후 다시 시도해주세요.</p>';
+
+  const maxTemp    = Math.max(...list.map(x => x.city.data.temp));
+  const minTemp    = Math.min(...list.map(x => x.city.data.temp));
+  const minHumid   = Math.min(...list.map(x => x.city.data.humidity));
+  const minWind    = Math.min(...list.map(x => x.city.data.wind));
+
+  const header = `<tr>
+    <th style="min-width:80px"></th>
+    ${list.map(x => `<th class="city-col">
+      <div class="cmp-mascot">${MASCOTS[x.city.name] ?? ''}</div>
+      ${x.city.name}<br>
+      <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted)">${x.city.country}</span>
+    </th>`).join('')}
+  </tr>`;
+
+  const rows = [
+    { label: '🕐 현지 시간', fn: x => {
+        const tz = (x.city.data.timezone || x.city.tz || '');
+        return tz ? new Date().toLocaleTimeString('ko-KR', { timeZone: tz, hour: '2-digit', minute: '2-digit' }) : '—';
+    }},
+    { label: '🌤 날씨', fn: x => {
+        const info = wmoInfo(x.city.data.weatherCode);
+        return `${info.icon} ${info.desc}`;
+    }},
+    { label: '🌡 기온', fn: x => {
+        const cls = x.city.data.temp === maxTemp ? 'cmp-win-hot' : x.city.data.temp === minTemp ? 'cmp-win-cold' : '';
+        return `<span class="${cls}">${toDisplay(x.city.data.temp)}</span>`;
+    }},
+    { label: '체감온도', fn: x => toDisplay(x.city.data.feelsLike) },
+    { label: '💧 습도', fn: x => {
+        const cls = x.city.data.humidity === minHumid ? 'cmp-win-best' : '';
+        return `<span class="${cls}">${x.city.data.humidity}%</span>`;
+    }},
+    { label: '💨 풍속', fn: x => {
+        const cls = x.city.data.wind === minWind ? 'cmp-win-best' : '';
+        return `<span class="${cls}">${x.city.data.wind} m/s</span>`;
+    }},
+  ];
+
+  const bodyRows = rows.map(r =>
+    `<tr><td>${r.label}</td>${list.map(x => `<td>${r.fn(x)}</td>`).join('')}</tr>`
+  ).join('');
+
+  return `<div style="overflow-x:auto">
+    <table class="compare-table">
+      <thead>${header}</thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+  </div>
+  <p style="font-size:0.75rem;color:var(--text-muted);margin-top:14px">
+    <span class="cmp-win-hot">■</span> 최고 기온 &nbsp;
+    <span class="cmp-win-cold">■</span> 최저 기온 &nbsp;
+    <span class="cmp-win-best">■</span> 최적값(낮을수록 쾌적)
+  </p>`;
+}
+
+/* ─────────────── 현지 시간 업데이트 (1분마다) ─────────────── */
+setInterval(() => {
+  document.querySelectorAll('.card-localtime[data-tz]').forEach(el => {
+    const tz = el.dataset.tz;
+    if (!tz) return;
+    const t = new Date().toLocaleTimeString('ko-KR', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
+    el.textContent = '🕐 ' + t;
+  });
+}, 60 * 1000);
+
+/* ─────────────── 자동 새로고침 ─────────────── */
+setInterval(loadAll, 10 * 60 * 1000);
+
+/* ─────────────── 초기화 ─────────────── */
+initMap();
+loadAll();
+</script>
+</body>
+</html>
