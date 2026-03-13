@@ -476,6 +476,58 @@
     .flag-mascot { font-size: 52px; line-height: 1; display: block; }
     .cb-mascot .flag-mascot { font-size: 72px; }
 
+    /* ── Settings Modal ── */
+    #settingsModal {
+      display: none; position: fixed; inset: 0; z-index: 2000;
+      background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    .settings-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; width: 100%; max-width: 420px;
+      padding: 28px 28px 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: fadeIn 0.2s ease;
+    }
+    .settings-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 20px;
+    }
+    .settings-title { font-size: 1.05rem; font-weight: 700; }
+    .settings-close {
+      background: none; border: none; color: var(--text-muted);
+      font-size: 1.3rem; cursor: pointer; line-height: 1;
+    }
+    .settings-section { margin-bottom: 18px; }
+    .settings-label {
+      font-size: 0.78rem; font-weight: 600; color: var(--text-muted);
+      letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 8px;
+    }
+    .settings-desc { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px; line-height: 1.5; }
+    .settings-row { display: flex; gap: 8px; align-items: center; }
+    .settings-input {
+      flex: 1; padding: 9px 12px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text); font-size: 0.88rem; outline: none;
+      font-family: monospace;
+    }
+    .settings-input:focus { border-color: var(--accent); }
+    .settings-save {
+      padding: 9px 16px; border-radius: 10px; border: none;
+      background: var(--accent); color: #fff; font-size: 0.88rem;
+      font-weight: 600; cursor: pointer; white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+    .settings-save:hover { opacity: 0.85; }
+    .settings-toast {
+      font-size: 0.8rem; color: #22c55e; margin-top: 8px;
+      min-height: 18px; transition: opacity 0.3s;
+    }
+    .settings-status {
+      font-size: 0.8rem; padding: 6px 10px; border-radius: 8px;
+      background: var(--surface2); border: 1px solid var(--border);
+      margin-top: 8px; display: flex; align-items: center; gap: 6px;
+    }
+
     /* ── Footer ── */
     footer {
       text-align: center;
@@ -523,9 +575,36 @@
       <button class="btn"        id="btnF" onclick="setUnit('F')">°F</button>
       <!-- 테마 -->
       <button class="btn" id="themeBtn" onclick="toggleTheme()">☀️ 라이트</button>
+      <!-- 설정 -->
+      <button class="btn" id="settingsBtn" onclick="openSettings()" title="ElevenLabs 음성 설정">⚙️</button>
     </div>
   </div>
 </header>
+
+<!-- 설정 모달 -->
+<div id="settingsModal" onclick="if(event.target===this)closeSettings()">
+  <div class="settings-box">
+    <div class="settings-header">
+      <div class="settings-title">⚙️ 음성 설정</div>
+      <button class="settings-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="settings-section">
+      <div class="settings-label">ElevenLabs API Key</div>
+      <div class="settings-desc">
+        고품질 다국어 음성을 사용하려면 API 키를 입력하세요.<br>
+        키가 없으면 브라우저 기본 음성으로 재생됩니다.<br>
+        <a href="https://elevenlabs.io" target="_blank" style="color:var(--accent)">elevenlabs.io</a>에서 무료로 발급 (월 10,000자)
+      </div>
+      <div class="settings-row">
+        <input id="elApiKeyInput" class="settings-input" type="password"
+          placeholder="sk_..." autocomplete="off" />
+        <button class="settings-save" onclick="saveElApiKey()">저장</button>
+      </div>
+      <div class="settings-toast" id="settingsToast"></div>
+      <div class="settings-status" id="settingsStatus"></div>
+    </div>
+  </div>
+</div>
 
 <div class="sort-bar" id="sortBar">
   <span class="sort-label">정렬:</span>
@@ -1337,8 +1416,48 @@ const COUNTRY_LANG = {
   UA:'uk-UA', RS:'sr-RS', HR:'hr-HR', SK:'sk-SK', BG:'bg-BG',
 };
 
-function speakGreeting(city) {
-  if (!('speechSynthesis' in window)) return;
+/* ── ElevenLabs TTS ── */
+let _elAudio = null; // 현재 재생 중인 Audio 인스턴스
+
+async function speakWithElevenLabs(text) {
+  const apiKey = localStorage.getItem('el_api_key');
+  if (!apiKey) return false;
+
+  try {
+    const VOICE_ID = 'EXAVITQu4vr4xnSDxMaL'; // Sarah — eleven_multilingual_v2 지원
+    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+      }),
+    });
+    if (!res.ok) return false;
+
+    // 기존 재생 중지
+    if (_elAudio) { _elAudio.pause(); _elAudio = null; }
+
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    _elAudio   = new Audio(url);
+    _elAudio.play();
+    _elAudio.onended = () => { URL.revokeObjectURL(url); _elAudio = null; };
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function stopElevenLabsAudio() {
+  if (_elAudio) { _elAudio.pause(); _elAudio = null; }
+}
+
+async function speakGreeting(city) {
   if (!city?.data) return;
   const tz = city.data.timezone || city.tz || '';
   const period = getTimeOfDay(tz);
@@ -1346,10 +1465,15 @@ function speakGreeting(city) {
   // 이모지 제거 후 텍스트만 추출
   const text = raw.replace(/[\u{1F000}-\u{1FFFF}]/gu, '').replace(/[✨🌸🌟⭐🎉🌞🌿🌺🌻🎊🎶🌊🏔️🌴🌹]/gu, '').trim();
   if (!text) return;
+
+  // ElevenLabs 우선 시도 → 실패하면 Web Speech API 폴백
+  const ok = await speakWithElevenLabs(text);
+  if (ok) return;
+
+  // 폴백: Web Speech API
+  if (!('speechSynthesis' in window)) return;
   const lang = LANG_CODES[city.name] || COUNTRY_LANG[city.countryCode || ''] || 'en-US';
-
   speechSynthesis.cancel();
-
   const doSpeak = () => {
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = lang;
@@ -1357,8 +1481,6 @@ function speakGreeting(city) {
     utter.pitch = 1.05;
     speechSynthesis.speak(utter);
   };
-
-  // 음성 목록이 아직 로드되지 않았으면 이벤트 대기 후 발화
   if (speechSynthesis.getVoices().length > 0) {
     doSpeak();
   } else {
@@ -1375,7 +1497,8 @@ function flipCard(i) {
     // 뒷면으로 전환 → 인사말 음성 출력
     speakGreeting(cities[i]);
   } else {
-    // 앞면으로 복귀 → 음성 중지
+    // 앞면으로 복귀 → 음성 중지 (ElevenLabs + Web Speech)
+    stopElevenLabsAudio();
     if ('speechSynthesis' in window) speechSynthesis.cancel();
   }
 }
@@ -1894,6 +2017,55 @@ setInterval(() => {
     el.textContent = '🕐 ' + t;
   });
 }, 60 * 1000);
+
+/* ─────────────── 설정 모달 ─────────────── */
+function openSettings() {
+  const modal = document.getElementById('settingsModal');
+  const input = document.getElementById('elApiKeyInput');
+  const status = document.getElementById('settingsStatus');
+  const saved = localStorage.getItem('el_api_key') || '';
+  // 저장된 키가 있으면 마스킹 표시
+  input.value = saved ? saved : '';
+  input.placeholder = saved ? '••••••••••••••••••••' : 'sk_...';
+  // 상태 표시
+  status.innerHTML = saved
+    ? `✅ API 키 저장됨 &nbsp;<button onclick="clearElApiKey()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.78rem;text-decoration:underline;">삭제</button>`
+    : '⚠️ API 키 미설정 — 브라우저 기본 음성 사용 중';
+  document.getElementById('settingsToast').textContent = '';
+  modal.style.display = 'flex';
+  setTimeout(() => input.focus(), 100);
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').style.display = 'none';
+}
+
+function saveElApiKey() {
+  const val = document.getElementById('elApiKeyInput').value.trim();
+  const toast = document.getElementById('settingsToast');
+  const status = document.getElementById('settingsStatus');
+  if (!val) {
+    toast.style.color = '#ef4444';
+    toast.textContent = '⚠️ API 키를 입력해주세요.';
+    return;
+  }
+  localStorage.setItem('el_api_key', val);
+  toast.style.color = '#22c55e';
+  toast.textContent = '✅ 저장되었습니다!';
+  status.innerHTML = `✅ API 키 저장됨 &nbsp;<button onclick="clearElApiKey()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.78rem;text-decoration:underline;">삭제</button>`;
+  setTimeout(() => { toast.textContent = ''; }, 2500);
+}
+
+function clearElApiKey() {
+  localStorage.removeItem('el_api_key');
+  document.getElementById('elApiKeyInput').value = '';
+  document.getElementById('elApiKeyInput').placeholder = 'sk_...';
+  document.getElementById('settingsStatus').textContent = '⚠️ API 키 미설정 — 브라우저 기본 음성 사용 중';
+  const toast = document.getElementById('settingsToast');
+  toast.style.color = '#f59e0b';
+  toast.textContent = '🗑 API 키가 삭제되었습니다.';
+  setTimeout(() => { toast.textContent = ''; }, 2500);
+}
 
 /* ─────────────── 자동 새로고침 ─────────────── */
 setInterval(loadAll, 10 * 60 * 1000);
