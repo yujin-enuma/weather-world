@@ -460,8 +460,11 @@
       width: auto;
       pointer-events: none;
       filter: drop-shadow(1px 2px 5px rgba(0,0,0,0.18));
+      display: flex; align-items: flex-end;
     }
     .mascot svg { height: 72px; width: auto; display: block; }
+    .flag-mascot { font-size: 52px; line-height: 1; display: block; }
+    .cb-mascot .flag-mascot { font-size: 72px; }
 
     /* ── Footer ── */
     footer {
@@ -1153,6 +1156,120 @@ const GREETINGS = {
 };
 const PERIOD_KO = { morning: '아침', afternoon: '낮', evening: '저녁' };
 
+/* ─────────────── 국가 코드별 인사말 (추가 도시 폴백) ─────────────── */
+const COUNTRY_GREETINGS = {
+  // 동아시아
+  KR: { morning: '좋은 아침이에요! 🌅',      afternoon: '안녕하세요! ☀️',             evening: '안녕히 계세요! 🌙' },
+  JP: { morning: 'おはようございます！🌅',     afternoon: 'こんにちは！☀️',              evening: 'こんばんは！🌙' },
+  CN: { morning: '早上好！🌅',                afternoon: '下午好！☀️',                  evening: '晚上好！🌙' },
+  TW: { morning: '早安！🌅',                  afternoon: '午安！☀️',                    evening: '晚安！🌙' },
+  HK: { morning: '早晨！🌅',                  afternoon: '午安！☀️',                    evening: '晚安！🌙' },
+  MO: { morning: '早晨！🌅',                  afternoon: '午安！☀️',                    evening: '晚安！🌙' },
+  MN: { morning: 'Өглөөний мэнд! 🌅',        afternoon: 'Сайн байна уу! ☀️',          evening: 'Оройн мэнд! 🌙' },
+  // 동남아시아
+  TH: { morning: 'อรุณสวัสดิ์! 🌅',          afternoon: 'สวัสดีตอนบ่าย! ☀️',         evening: 'ราตรีสวัสดิ์! 🌙' },
+  VN: { morning: 'Chào buổi sáng! 🌅',       afternoon: 'Xin chào! ☀️',               evening: 'Chào buổi tối! 🌙' },
+  ID: { morning: 'Selamat pagi! 🌅',          afternoon: 'Selamat siang! ☀️',           evening: 'Selamat malam! 🌙' },
+  MY: { morning: 'Selamat pagi! 🌅',          afternoon: 'Selamat tengah hari! ☀️',     evening: 'Selamat malam! 🌙' },
+  SG: { morning: 'Good morning! 🌅',          afternoon: 'Selamat tengah hari! ☀️',     evening: 'Selamat malam! 🌙' },
+  PH: { morning: 'Magandang umaga! 🌅',       afternoon: 'Magandang tanghali! ☀️',      evening: 'Magandang gabi! 🌙' },
+  MM: { morning: 'မင်္ဂလာနံနက်ခင်းပါ! 🌅',  afternoon: 'မင်္ဂလာပါ! ☀️',              evening: 'မင်္ဂလာညနေ! 🌙' },
+  KH: { morning: 'អរុណសួស្ដី! 🌅',           afternoon: 'សួស្ដី! ☀️',                 evening: 'រាត្រីសួស្ដី! 🌙' },
+  // 남아시아
+  IN: { morning: 'सुप्रभात! 🌅',              afternoon: 'नमस्ते! ☀️',                 evening: 'शुभ संध्या! 🌙' },
+  PK: { morning: '!صبح بخیر 🌅',             afternoon: '!آداب ☀️',                    evening: '!شب بخیر 🌙' },
+  BD: { morning: 'শুভ সকাল! 🌅',             afternoon: 'নমস্কার! ☀️',                evening: 'শুভ সন্ধ্যা! 🌙' },
+  NP: { morning: 'शुभ प्रभात! 🌅',            afternoon: 'नमस्ते! ☀️',                 evening: 'शुभ साँझ! 🌙' },
+  LK: { morning: 'සුභ උදෑසනක්! 🌅',         afternoon: 'ආයුබෝවන්! ☀️',               evening: 'සුභ සන්ධ්‍යාවක්! 🌙' },
+  // 중동
+  AE: { morning: '!صباح الخير 🌅',           afternoon: '!مرحبا ☀️',                   evening: '!مساء الخير 🌙' },
+  SA: { morning: '!صباح الخير 🌅',           afternoon: '!مرحبا ☀️',                   evening: '!مساء الخير 🌙' },
+  EG: { morning: '!صباح الخير 🌅',           afternoon: '!مرحبا ☀️',                   evening: '!مساء الخير 🌙' },
+  IQ: { morning: '!صباح الخير 🌅',           afternoon: '!مرحبا ☀️',                   evening: '!مساء الخير 🌙' },
+  JO: { morning: '!صباح الخير 🌅',           afternoon: '!مرحبا ☀️',                   evening: '!مساء الخير 🌙' },
+  KW: { morning: '!صباح الخير 🌅',           afternoon: '!مرحبا ☀️',                   evening: '!مساء الخير 🌙' },
+  QA: { morning: '!صباح الخير 🌅',           afternoon: '!مرحبا ☀️',                   evening: '!مساء الخير 🌙' },
+  IR: { morning: '!صبح بخیر 🌅',             afternoon: '!سلام ☀️',                    evening: '!شب بخیر 🌙' },
+  IL: { morning: '!בוקר טוב 🌅',             afternoon: '!שלום ☀️',                    evening: '!ערב טוב 🌙' },
+  TR: { morning: 'Günaydın! 🌅',             afternoon: 'İyi günler! ☀️',              evening: 'İyi akşamlar! 🌙' },
+  // 서유럽
+  GB: { morning: 'Good morning! 🌅',         afternoon: 'Good afternoon! ☀️',          evening: 'Good evening! 🌙' },
+  IE: { morning: 'Good morning! 🌅',         afternoon: 'Good afternoon! ☀️',          evening: 'Good evening! 🌙' },
+  FR: { morning: 'Bonjour ! 🌅',             afternoon: 'Bon après-midi ! ☀️',         evening: 'Bonsoir ! 🌙' },
+  DE: { morning: 'Guten Morgen! 🌅',         afternoon: 'Guten Tag! ☀️',               evening: 'Guten Abend! 🌙' },
+  AT: { morning: 'Guten Morgen! 🌅',         afternoon: 'Guten Tag! ☀️',               evening: 'Guten Abend! 🌙' },
+  CH: { morning: 'Guten Morgen! 🌅',         afternoon: 'Guten Tag! ☀️',               evening: 'Guten Abend! 🌙' },
+  IT: { morning: 'Buongiorno! 🌅',           afternoon: 'Buon pomeriggio! ☀️',         evening: 'Buonasera! 🌙' },
+  ES: { morning: '¡Buenos días! 🌅',         afternoon: '¡Buenas tardes! ☀️',          evening: '¡Buenas noches! 🌙' },
+  PT: { morning: 'Bom dia! 🌅',              afternoon: 'Boa tarde! ☀️',               evening: 'Boa noite! 🌙' },
+  NL: { morning: 'Goedemorgen! 🌅',          afternoon: 'Goedemiddag! ☀️',             evening: 'Goedenavond! 🌙' },
+  BE: { morning: 'Goedemorgen! 🌅',          afternoon: 'Goedemiddag! ☀️',             evening: 'Goedenavond! 🌙' },
+  LU: { morning: 'Gudde Moien! 🌅',          afternoon: 'Gudde Mëtteg! ☀️',            evening: 'Gudden Owend! 🌙' },
+  // 북유럽
+  SE: { morning: 'God morgon! 🌅',           afternoon: 'God dag! ☀️',                 evening: 'God kväll! 🌙' },
+  NO: { morning: 'God morgen! 🌅',           afternoon: 'God dag! ☀️',                 evening: 'God kveld! 🌙' },
+  DK: { morning: 'God morgen! 🌅',           afternoon: 'God dag! ☀️',                 evening: 'God aften! 🌙' },
+  FI: { morning: 'Hyvää huomenta! 🌅',       afternoon: 'Hyvää päivää! ☀️',            evening: 'Hyvää iltaa! 🌙' },
+  IS: { morning: 'Góðan daginn! 🌅',         afternoon: 'Góðan dag! ☀️',               evening: 'Gott kvöld! 🌙' },
+  // 동유럽
+  RU: { morning: 'Доброе утро! 🌅',          afternoon: 'Добрый день! ☀️',             evening: 'Добрый вечер! 🌙' },
+  UA: { morning: 'Доброго ранку! 🌅',        afternoon: 'Добрий день! ☀️',             evening: 'Добрий вечір! 🌙' },
+  PL: { morning: 'Dzień dobry! 🌅',          afternoon: 'Dzień dobry! ☀️',             evening: 'Dobry wieczór! 🌙' },
+  CZ: { morning: 'Dobré ráno! 🌅',           afternoon: 'Dobré odpoledne! ☀️',         evening: 'Dobrý večer! 🌙' },
+  SK: { morning: 'Dobré ráno! 🌅',           afternoon: 'Dobrý deň! ☀️',               evening: 'Dobrý večer! 🌙' },
+  HU: { morning: 'Jó reggelt! 🌅',           afternoon: 'Jó napot! ☀️',                evening: 'Jó estét! 🌙' },
+  RO: { morning: 'Bună dimineața! 🌅',       afternoon: 'Bună ziua! ☀️',               evening: 'Bună seara! 🌙' },
+  BG: { morning: 'Добро утро! 🌅',           afternoon: 'Добър ден! ☀️',               evening: 'Добър вечер! 🌙' },
+  RS: { morning: 'Добро јутро! 🌅',          afternoon: 'Добар дан! ☀️',               evening: 'Добро вече! 🌙' },
+  HR: { morning: 'Dobro jutro! 🌅',          afternoon: 'Dobar dan! ☀️',               evening: 'Dobra večer! 🌙' },
+  GR: { morning: 'Καλημέρα! 🌅',             afternoon: 'Χαίρετε! ☀️',                evening: 'Καλησπέρα! 🌙' },
+  // 아메리카
+  US: { morning: 'Good morning! 🌅',         afternoon: 'Good afternoon! ☀️',          evening: 'Good evening! 🌙' },
+  CA: { morning: 'Good morning! 🌅',         afternoon: 'Good afternoon! ☀️',          evening: 'Good evening! 🌙' },
+  MX: { morning: '¡Buenos días! 🌅',         afternoon: '¡Buenas tardes! ☀️',          evening: '¡Buenas noches! 🌙' },
+  BR: { morning: 'Bom dia! 🌅',              afternoon: 'Boa tarde! ☀️',               evening: 'Boa noite! 🌙' },
+  AR: { morning: '¡Buenos días! 🌅',         afternoon: '¡Buenas tardes! ☀️',          evening: '¡Buenas noches! 🌙' },
+  CO: { morning: '¡Buenos días! 🌅',         afternoon: '¡Buenas tardes! ☀️',          evening: '¡Buenas noches! 🌙' },
+  CL: { morning: '¡Buenos días! 🌅',         afternoon: '¡Buenas tardes! ☀️',          evening: '¡Buenas noches! 🌙' },
+  PE: { morning: '¡Buenos días! 🌅',         afternoon: '¡Buenas tardes! ☀️',          evening: '¡Buenas noches! 🌙' },
+  VE: { morning: '¡Buenos días! 🌅',         afternoon: '¡Buenas tardes! ☀️',          evening: '¡Buenas noches! 🌙' },
+  // 오세아니아
+  AU: { morning: 'Good morning! 🌅',         afternoon: "G'day! ☀️",                   evening: 'Good evening! 🌙' },
+  NZ: { morning: 'Good morning! 🌅',         afternoon: 'Good afternoon! ☀️',          evening: 'Good evening! 🌙' },
+  // 아프리카
+  ZA: { morning: 'Good morning! 🌅',         afternoon: 'Good afternoon! ☀️',          evening: 'Good evening! 🌙' },
+  NG: { morning: 'Ẹ káàárọ̀! 🌅',            afternoon: 'Ẹ káàsán! ☀️',               evening: 'Ẹ kúirọlẹ! 🌙' },
+  KE: { morning: 'Habari ya asubuhi! 🌅',    afternoon: 'Habari za mchana! ☀️',        evening: 'Habari za jioni! 🌙' },
+  ET: { morning: 'እንደምን አደርክ! 🌅',          afternoon: 'ሰላም! ☀️',                    evening: 'እንደምን ዋልክ! 🌙' },
+  GH: { morning: 'Mema wo akye! 🌅',         afternoon: 'Mema wo aha! ☀️',             evening: 'Mema wo adwo! 🌙' },
+  MA: { morning: '!صباح الخير 🌅',           afternoon: '!مرحبا ☀️',                   evening: '!مساء الخير 🌙' },
+  TN: { morning: '!صباح الخير 🌅',           afternoon: '!مرحبا ☀️',                   evening: '!مساء الخير 🌙' },
+  DZ: { morning: '!صباح الخير 🌅',           afternoon: '!مرحبا ☀️',                   evening: '!مساء الخير 🌙' },
+};
+
+/* 국가 코드 → 국기 이모지 변환 */
+function countryFlag(code) {
+  if (!code || code.length !== 2) return '🌍';
+  return [...code.toUpperCase()].map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)).join('');
+}
+
+/* 인사말 통합 헬퍼: 도시명 → 국가코드 순으로 폴백 */
+function getGreeting(city, period) {
+  const byName = GREETINGS[city.name];
+  if (byName) return byName[period] || '';
+  const byCode = COUNTRY_GREETINGS[city.countryCode || ''];
+  if (byCode) return byCode[period] || '';
+  return { morning: 'Good morning! 🌅', afternoon: 'Hello! ☀️', evening: 'Good evening! 🌙' }[period] || '';
+}
+
+/* 마스코트 통합 헬퍼: SVG 없으면 국기 이모지 */
+function getMascot(city) {
+  const svg = MASCOTS[city.name];
+  if (svg) return { type: 'svg', html: svg };
+  const flag = countryFlag(city.countryCode || '');
+  return { type: 'flag', html: `<span class="flag-mascot">${flag}</span>` };
+}
+
 function getTimeOfDay(tz) {
   if (!tz) return 'afternoon';
   const h = parseInt(new Date().toLocaleString('en-US', { timeZone: tz, hour: '2-digit', hour12: false }), 10);
@@ -1187,13 +1304,13 @@ function renderCard(i, el) {
   el.className = compareList.includes(i) ? 'card comparing' : 'card';
 
   if (city.error) {
-    const mascotErr = MASCOTS[city.name] ?? '';
+    const mascotErr = getMascot(city);
     const tzErr = city.tz || '';
     const timeErr = tzErr
       ? new Date().toLocaleTimeString('ko-KR', { timeZone: tzErr, hour: '2-digit', minute: '2-digit' })
       : '';
     const periodErr = getTimeOfDay(tzErr);
-    const greetingErr = (GREETINGS[city.name] || {})[periodErr] || '';
+    const greetingErr = getGreeting(city, periodErr);
     el.innerHTML = `
       <div class="card-inner">
         <div class="card-front">
@@ -1202,10 +1319,10 @@ function renderCard(i, el) {
           <div class="card-country">${city.country}</div>
           ${timeErr ? `<div class="card-localtime" data-tz="${tzErr}">🕐 ${timeErr}</div>` : ''}
           <div class="error-msg">⚠️ ${city.error}</div>
-          <div class="mascot">${mascotErr}</div>
+          <div class="mascot">${mascotErr.html}</div>
         </div>
         <div class="card-back card-back-${periodErr}">
-          <div class="cb-mascot">${mascotErr}</div>
+          <div class="cb-mascot">${mascotErr.html}</div>
           ${greetingErr ? `<div class="cb-greeting">${greetingErr}</div>` : ''}
           <div class="cb-city">${city.name}</div>
           <div class="cb-period">${PERIOD_KO[periodErr]}</div>
@@ -1221,13 +1338,13 @@ function renderCard(i, el) {
   const tc     = tempClass(d.temp);
   const barW   = tempBarWidth(d.temp);
   const barC   = tempBarColor(d.temp);
-  const mascot = MASCOTS[city.name] ?? '';
+  const mascot = getMascot(city);
   const tz = d.timezone || city.tz || '';
   const localTime = tz
     ? new Date().toLocaleTimeString('ko-KR', { timeZone: tz, hour: '2-digit', minute: '2-digit' })
     : '';
   const period   = getTimeOfDay(tz);
-  const greeting = (GREETINGS[city.name] || {})[period] || '';
+  const greeting = getGreeting(city, period);
 
   el.innerHTML = `
     <div class="card-inner">
@@ -1257,10 +1374,10 @@ function renderCard(i, el) {
           <div class="card-bar-fill" style="width:${barW};background:${barC}"></div>
         </div>
         <button class="card-compare-btn ${compareList.includes(i) ? 'active' : ''}" onclick="event.stopPropagation();toggleCompare(${i})">${compareList.includes(i) ? '✓ 비교 중' : '+ 비교'}</button>
-        <div class="mascot">${mascot}</div>
+        <div class="mascot">${mascot.html}</div>
       </div>
       <div class="card-back card-back-${period}">
-        <div class="cb-mascot">${mascot}</div>
+        <div class="cb-mascot">${mascot.html}</div>
         ${greeting ? `<div class="cb-greeting">${greeting}</div>` : ''}
         <div class="cb-city">${city.name} · ${city.country}</div>
         <div class="cb-period">${PERIOD_KO[period]}</div>
@@ -1494,7 +1611,7 @@ async function addCityFromGeo(i) {
   autocomplete.style.display = 'none';
   searchInput.value = '';
 
-  const newCity = { name: r.name, country: r.country ?? '', lat: r.latitude, lon: r.longitude, data: null, error: null };
+  const newCity = { name: r.name, country: r.country ?? '', countryCode: (r.country_code ?? '').toUpperCase(), lat: r.latitude, lon: r.longitude, data: null, error: null };
   const idx = cities.length;
   cities.push(newCity);
   cityMarkers.push(null);
