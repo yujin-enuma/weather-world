@@ -1313,9 +1313,60 @@ function getTimeOfDay(tz) {
   return h >= 5 && h < 12 ? 'morning' : h >= 12 && h < 18 ? 'afternoon' : 'evening';
 }
 
+/* ── 음성 인사말 언어 코드 매핑 ── */
+const LANG_CODES = {
+  '서울': 'ko-KR', '도쿄': 'ja-JP', '뉴욕': 'en-US', '런던': 'en-GB',
+  '파리': 'fr-FR', '시드니': 'en-AU', '두바이': 'ar-AE', '싱가포르': 'ms-SG',
+  '베이징': 'zh-CN', '뭄바이': 'hi-IN', '카이로': 'ar-EG', '모스크바': 'ru-RU',
+  '상파울루': 'pt-BR', '멕시코시티': 'es-MX', '토론토': 'en-CA',
+  '베를린': 'de-DE', '이스탄불': 'tr-TR', '방콕': 'th-TH',
+  '라고스': 'yo-NG', '부에노스아이레스': 'es-AR',
+};
+const COUNTRY_LANG = {
+  KR:'ko-KR', JP:'ja-JP', CN:'zh-CN', TW:'zh-TW', HK:'zh-HK',
+  US:'en-US', GB:'en-GB', AU:'en-AU', CA:'en-CA', NZ:'en-NZ', ZA:'en-ZA',
+  FR:'fr-FR', BE:'fr-BE', CH:'de-CH', DE:'de-DE', AT:'de-AT',
+  IT:'it-IT', ES:'es-ES', MX:'es-MX', AR:'es-AR', CO:'es-CO', CL:'es-CL',
+  PT:'pt-PT', BR:'pt-BR', RU:'ru-RU', TR:'tr-TR', TH:'th-TH',
+  ID:'id-ID', IN:'hi-IN', PK:'ur-PK', BD:'bn-BD',
+  SA:'ar-SA', AE:'ar-AE', EG:'ar-EG', MA:'ar-MA',
+  NL:'nl-NL', PL:'pl-PL', CZ:'cs-CZ', SE:'sv-SE', NO:'nb-NO', DK:'da-DK',
+  FI:'fi-FI', HU:'hu-HU', RO:'ro-RO', GR:'el-GR', IL:'he-IL',
+  VN:'vi-VN', KH:'km-KH', MY:'ms-MY', PH:'fil-PH',
+  NG:'en-NG', KE:'sw-KE', ET:'am-ET', GH:'en-GH',
+  UA:'uk-UA', RS:'sr-RS', HR:'hr-HR', SK:'sk-SK', BG:'bg-BG',
+};
+
+function speakGreeting(city) {
+  if (!('speechSynthesis' in window)) return;
+  if (!city?.data) return;
+  const tz = city.data.timezone || city.tz || '';
+  const period = getTimeOfDay(tz);
+  const raw = getGreeting(city, period);
+  // 이모지 및 특수문자 제거 후 텍스트만 추출
+  const text = raw.replace(/[\u{1F300}-\u{1FFFF}]/gu, '').replace(/[!✨🌸🌟⭐🎉🌞🌿🌺🌻🎊🎶🌊🏔️🌴🌹]/gu, '').trim();
+  if (!text) return;
+  const lang = LANG_CODES[city.name] || COUNTRY_LANG[city.countryCode || ''] || 'en-US';
+  speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = lang;
+  utter.rate = 0.88;
+  utter.pitch = 1.05;
+  speechSynthesis.speak(utter);
+}
+
 function flipCard(i) {
   const el = document.getElementById(`card-${i}`);
-  if (el) el.classList.toggle('flipped');
+  if (!el) return;
+  const wasFlipped = el.classList.contains('flipped');
+  el.classList.toggle('flipped');
+  if (!wasFlipped) {
+    // 뒷면으로 전환 → 인사말 음성 출력
+    speakGreeting(cities[i]);
+  } else {
+    // 앞면으로 복귀 → 음성 중지
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+  }
 }
 
 function renderCard(i, el) {
