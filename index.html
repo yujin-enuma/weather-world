@@ -1343,16 +1343,27 @@ function speakGreeting(city) {
   const tz = city.data.timezone || city.tz || '';
   const period = getTimeOfDay(tz);
   const raw = getGreeting(city, period);
-  // 이모지 및 특수문자 제거 후 텍스트만 추출
-  const text = raw.replace(/[\u{1F300}-\u{1FFFF}]/gu, '').replace(/[!✨🌸🌟⭐🎉🌞🌿🌺🌻🎊🎶🌊🏔️🌴🌹]/gu, '').trim();
+  // 이모지 제거 후 텍스트만 추출
+  const text = raw.replace(/[\u{1F000}-\u{1FFFF}]/gu, '').replace(/[✨🌸🌟⭐🎉🌞🌿🌺🌻🎊🎶🌊🏔️🌴🌹]/gu, '').trim();
   if (!text) return;
   const lang = LANG_CODES[city.name] || COUNTRY_LANG[city.countryCode || ''] || 'en-US';
+
   speechSynthesis.cancel();
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = lang;
-  utter.rate = 0.88;
-  utter.pitch = 1.05;
-  speechSynthesis.speak(utter);
+
+  const doSpeak = () => {
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = lang;
+    utter.rate = 0.88;
+    utter.pitch = 1.05;
+    speechSynthesis.speak(utter);
+  };
+
+  // 음성 목록이 아직 로드되지 않았으면 이벤트 대기 후 발화
+  if (speechSynthesis.getVoices().length > 0) {
+    doSpeak();
+  } else {
+    speechSynthesis.addEventListener('voiceschanged', doSpeak, { once: true });
+  }
 }
 
 function flipCard(i) {
